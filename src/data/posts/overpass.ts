@@ -1,0 +1,60 @@
+import type { MapPost } from './types'
+
+export const overpassPosts: MapPost[] = [
+  {
+    id: 'de_overpass-20260210130308',
+    mapId: 'de_overpass',
+    title: 'BLOCK STAIRS',
+    images: ['overpass/block-stairs-t-smoke-1.jpg', 'overpass/block-stairs-t-smoke-2.jpg'],
+    tags: ['T', 'A', 'SMOKE'],
+    method: ['THROW'],
+  },
+  {
+    id: 'de_overpass-20260210130348',
+    mapId: 'de_overpass',
+    title: 'TRUCK',
+    images: ['overpass/truck-t-molo-1.jpg', 'overpass/truck-t-molo-2.jpg'],
+    tags: ['T', 'A', 'MOLO'],
+    method: ['THROW', 'WALK'],
+  },
+  {
+    id: 'de_overpass-20260210130409',
+    mapId: 'de_overpass',
+    title: 'STAIRS',
+    images: ['overpass/stairs-t-smoke-1.jpg', 'overpass/stairs-t-smoke-2.jpg'],
+    tags: ['T', 'A', 'SMOKE'],
+    method: ['THROW', 'JUMP'],
+  },
+  {
+    id: 'de_overpass-20260210130427',
+    mapId: 'de_overpass',
+    title: 'BANK',
+    images: ['overpass/bank-t-smoke-1.jpg', 'overpass/bank-t-smoke-2.jpg'],
+    tags: ['T', 'A', 'SMOKE'],
+    method: ['THROW', 'JUMP'],
+  },
+  {
+    id: 'de_overpass-20260210130447',
+    mapId: 'de_overpass',
+    title: 'SPAWN MONSTER',
+    images: ['overpass/spawn-monster-ct-smoke-1.jpg', 'overpass/spawn-monster-ct-smoke-2.jpg'],
+    tags: ['CT', 'B', 'SMOKE'],
+    method: ['THROW', 'JUMP'],
+  },
+  {
+    id: 'de_overpass-20260210130503',
+    mapId: 'de_overpass',
+    title: 'HEAVEN',
+    images: ['overpass/heaven-t-smoke-1.jpg', 'overpass/heaven-t-smoke-2.jpg'],
+    tags: ['T', 'B', 'SMOKE'],
+    method: ['THROW', 'JUMP'],
+  },
+  {
+    id: 'de_overpass-20260210130523',
+    mapId: 'de_overpass',
+    title: 'BARRELS / HEADSHOT',
+    images: ['overpass/barrels-headshot-t-molo-1.jpg', 'overpass/barrels-headshot-t-molo-2.jpg'],
+    tags: ['T', 'B', 'MOLO'],
+    method: ['THROW', 'WALK'],
+  },
+]
