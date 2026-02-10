@@ -145,4 +145,12 @@ export const infernoPosts: MapPost[] = [
     tags: ['CT', 'B', 'MOLO'],
     method: ['JUMP', 'THROW'],
   },
+  {
+    id: 'de_inferno-20260210135700',
+    mapId: 'de_inferno',
+    title: 'SYLARREKT SPECIAL',
+    images: ['inferno/sylarrekts-special-t-smoke-1.jpg', 'inferno/sylarrekts-special-t-smoke-2.jpg'],
+    tags: ['T', 'A', 'SMOKE'],
+    method: ['THROW', 'JUMP', 'RUN'],
+  },
 ]
