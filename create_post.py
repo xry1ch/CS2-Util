@@ -10,6 +10,8 @@ import shutil
 import re
 import json
 import zipfile
+import secrets
+import string
 from pathlib import Path
 from datetime import datetime
 import tkinter as tk
@@ -37,6 +39,11 @@ SIDES = ["CT", "T"]
 SITES = ["A", "MID", "B"]
 UTILITIES = ["SMOKE", "MOLO", "FLASH", "NADE"]
 METHOD_COMPONENTS = ["THROW", "DOUBLE", "JUMP", "CROUCH", "WALK", "RUN"]
+ID_ALPHABET = string.ascii_lowercase + string.digits
+
+
+def generate_short_id(length=8):
+    return "".join(secrets.choice(ID_ALPHABET) for _ in range(length))
 
 
 class PostCreatorApp:
@@ -509,10 +516,8 @@ class PostCreatorApp:
         if self.imported_post_data and "id" in self.imported_post_data:
             post_id = self.imported_post_data["id"]
         else:
-            # Generar ID basado en mapId + title (sin timestamp)
-            sanitized_title = re.sub(r'[^\w\s-]', '', title.lower())
-            sanitized_title = re.sub(r'[\s]+', '-', sanitized_title.strip())
-            post_id = f"{map_id}-{sanitized_title}"
+            # Generar ID corto aleatorio
+            post_id = f"{map_id}-{generate_short_id()}"
         
         # Generar nombre base para las imágenes
         sanitized_title = re.sub(r'[^\w\s-]', '', title.lower())

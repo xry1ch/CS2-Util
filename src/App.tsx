@@ -1,5 +1,6 @@
 import { ArrowLeft, X } from 'lucide-react'
 import JSZip from 'jszip'
+import { nanoid } from 'nanoid'
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -58,6 +59,7 @@ const sideOptions = ['CT', 'T']
 const siteOptions = ['A', 'MID', 'B']
 const tags = ['SMOKE', 'MOLO', 'FLASH', 'NADE']
 const methodComponents = ['THROW', 'DOUBLE', 'JUMP', 'CROUCH', 'WALK', 'RUN']
+const methodOrder = ['CROUCH', 'JUMP', 'THROW', 'DOUBLE', 'WALK', 'RUN']
 const sanitizeTitle = (value: string) =>
   value
     .replace(/[^a-zA-Z0-9 ]+/g, '')
@@ -77,7 +79,7 @@ function App() {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [activePost, setActivePost] = useState<MapPost | null>(null)
   const [viewerImage, setViewerImage] = useState<string | null>(null)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(0.85)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
@@ -162,6 +164,13 @@ function App() {
   const resolvePostImage = (path: string) =>
     postImages[`./assets/posts/${path}`]
 
+  const generatePostId = (mapId: string): string => `${mapId}-${nanoid(8)}`
+
+  const sortMethods = (methods: string[]) =>
+    [...methods].sort(
+      (a, b) => methodOrder.indexOf(a) - methodOrder.indexOf(b)
+    )
+
   const handleExportFiles = (files: FileList | null) => {
     if (!files) return
     const nextFiles = Array.from(files).filter((file) =>
@@ -226,11 +235,13 @@ function App() {
 
     try {
       const zip = new JSZip()
+      const postId = generatePostId(exportMapId)
       const jsonData = {
+        id: postId,
         mapId: exportMapId,
         title: exportTitle.trim(),
         tags: exportTags,
-        method: Array.from(exportMethod),
+        method: sortMethods(Array.from(exportMethod)),
         imageCount: exportImages.length,
         images: exportImages.map((file) => file.name),
       }
@@ -332,7 +343,7 @@ function App() {
         mapId: activePost.mapId,
         title: activePost.title,
         tags: activePost.tags,
-        method: activePost.method,
+        method: sortMethods(activePost.method),
         imageCount: currentImageCount,
         images: [
           ...activePost.images,
@@ -398,7 +409,7 @@ function App() {
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
     const delta = e.deltaY * -0.001
-    setZoom((prev) => Math.min(Math.max(1, prev + delta), 5))
+    setZoom((prev) => Math.min(Math.max(0.6, prev + delta), 5))
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -420,7 +431,7 @@ function App() {
 
   const closeViewer = () => {
     setViewerImage(null)
-    setZoom(1)
+    setZoom(0.85)
     setPan({ x: 0, y: 0 })
     setIsDragging(false)
   }
@@ -608,7 +619,7 @@ function App() {
                             {post.title}
                           </p>
                           <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                            {post.method.join(' ')}
+                            {sortMethods(post.method).join(' ')}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -673,7 +684,7 @@ function App() {
                     {activePost.title}
                   </h2>
                   <span className="rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-primary">
-                    {activePost.method.join(' ')}
+                    {sortMethods(activePost.method).join(' ')}
                   </span>
                 </div>
               </div>
@@ -1133,7 +1144,7 @@ function App() {
               }}
               draggable={false}
               onDoubleClick={() => {
-                setZoom(1)
+                setZoom(0.85)
                 setPan({ x: 0, y: 0 })
               }}
             />
