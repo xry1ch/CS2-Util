@@ -8,11 +8,14 @@ el archivo TypeScript y copia las imágenes.
 import os
 import shutil
 import re
+import json
+import zipfile
 from pathlib import Path
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinterdnd2 import DND_FILES, TkinterDnD
+import tempfile
 
 # Configuración de rutas
 SCRIPT_DIR = Path(__file__).parent
@@ -44,6 +47,12 @@ class PostCreatorApp:
         self.root.resizable(False, False)
         
         self.images = []
+        # Directorio temporal que persiste durante la sesión
+        self.temp_dir = Path(tempfile.mkdtemp(prefix="cs2_post_"))
+        
+        # Limpiar al cerrar
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
         self.create_widgets()
     
     def create_widgets(self):
@@ -176,9 +185,37 @@ class PostCreatorApp:
         
         form.columnconfigure(1, weight=1)
         
-        # Botón crear
+        # Frame de botones
+        buttons_frame = tk.Frame(self.root)
+        buttons_frame.pack(pady=20, padx=20, fill="x")
+        
+        # Botón Importar
+        btn_import = tk.Button(
+            buttons_frame,
+            text="Importar ZIP",
+            command=self.import_post,
+            bg="#2196F3",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            pady=10,
+        )
+        btn_import.pack(side="left", expand=True, fill="x", padx=5)
+        
+        # Botón Exportar
+        btn_export = tk.Button(
+            buttons_frame,
+            text="Exportar ZIP",
+            command=self.export_post,
+            bg="#FF9800",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            pady=10,
+        )
+        btn_export.pack(side="left", expand=True, fill="x", padx=5)
+        
+        # Botón Crear
         btn_create = tk.Button(
-            self.root,
+            buttons_frame,
             text="Crear Post",
             command=self.create_post,
             bg="#4CAF50",
@@ -186,7 +223,7 @@ class PostCreatorApp:
             font=("Arial", 12, "bold"),
             pady=10,
         )
-        btn_create.pack(pady=20, padx=20, fill="x")
+        btn_create.pack(side="left", expand=True, fill="x", padx=5)
     
     def select_images(self):
         files = filedialog.askopenfilenames(
@@ -232,6 +269,198 @@ class PostCreatorApp:
         """Limpia las imágenes seleccionadas"""
         self.images = []
         self.update_image_list()
+    
+    def on_closing(self):
+        """Limpia el directorio temporal al cerrar"""
+        try:
+            if self.temp_dir.exists():
+                shutil.rmtree(self.temp_dir)
+        except Exception:
+            pass
+        self.root.destroy()
+    
+    def export_post(self):
+        """Exporta el post actual a un archivo ZIP con JSON e imágenes"""
+        # Validar
+        if not self.images:
+            messagebox.showerror("Error", "Debes seleccionar al menos una imagen")
+            return
+        
+        title = self.title_entry.get().strip()
+        if not title:
+            messagebox.showerror("Error", "Debes ingresar un título")
+            return
+        
+        map_id = self.map_var.get()
+        
+        # Obtener method components
+        method = []
+        for component, var in self.method_vars.items():
+            if var.get():
+                method.append(component)
+        
+        if not method:
+            messagebox.showerror("Error", "Debes seleccionar al menos un componente de método")
+            return
+        
+        # Obtener tags
+        tags = []
+        for side, var in self.side_vars.items():
+            if var.get():
+                tags.append(side)
+        for site, var in self.site_vars.items():
+            if var.get():
+                tags.append(site)
+        for util, var in self.util_vars.items():
+            if var.get():
+                tags.append(util)
+        
+        if not tags:
+            messagebox.showerror("Error", "Debes seleccionar al menos un tag")
+            return
+        
+        # Crear JSON con los datos del post
+        post_data = {
+            "mapId": map_id,
+            "title": title,
+            "tags": tags,
+            "method": method,
+            "imageCount": len(self.images),
+            "images": [Path(img).name for img in self.images]
+        }
+        
+        # Seleccionar ubicación de guardado
+        zip_path = filedialog.asksaveasfilename(
+            title="Guardar como",
+            defaultextension=".zip",
+            filetypes=[("Archivo ZIP", "*.zip")],
+            initialfile=f"cs2-post-{title.replace(' ', '-').lower()}.zip"
+        )
+        
+        if not zip_path:
+            return
+        
+        try:
+            # Crear ZIP
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Agregar JSON
+                json_data = json.dumps(post_data, indent=2)
+                zipf.writestr("post.json", json_data)
+                
+                # Agregar imágenes
+                for i, img_path in enumerate(self.images):
+                    ext = Path(img_path).suffix
+                    new_name = f"image_{i+1}{ext}"
+                    zipf.write(img_path, f"images/{new_name}")
+            
+            messagebox.showinfo(
+                "Éxito",
+                f"Post exportado correctamente!\n\nArchivo: {Path(zip_path).name}\nImágenes: {len(self.images)}"
+            )
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo exportar:\n{str(e)}")
+    
+    def import_post(self):
+        """Importa un post desde un archivo ZIP con JSON e imágenes"""
+        # Seleccionar archivo ZIP
+        zip_path = filedialog.askopenfilename(
+            title="Seleccionar archivo ZIP",
+            filetypes=[("Archivo ZIP", "*.zip"), ("Todos", "*.*")]
+        )
+        
+        if not zip_path:
+            return
+        
+        try:
+            # Crear directorio temporal
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                
+                # Extraer ZIP
+                with zipfile.ZipFile(zip_path, 'r') as zipf:
+                    zipf.extractall(temp_path)
+                
+                # Leer JSON
+                json_file = temp_path / "post.json"
+                if not json_file.exists():
+                    messagebox.showerror("Error", "El archivo ZIP no contiene post.json")
+                    return
+                
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    post_data = json.load(f)
+                
+                # Validar estructura del JSON
+                required_fields = ["mapId", "title", "tags", "method"]
+                for field in required_fields:
+                    if field not in post_data:
+                        messagebox.showerror("Error", f"El JSON no contiene el campo '{field}'")
+                        return
+                
+                # Buscar carpeta de imágenes
+                images_dir = temp_path / "images"
+                if not images_dir.exists():
+                    messagebox.showerror("Error", "El archivo ZIP no contiene la carpeta 'images'")
+                    return
+                
+                # Obtener lista de imágenes
+                image_files = sorted([f for f in images_dir.iterdir() if f.suffix.lower() in ['.png', '.jpg', '.jpeg', '.webp']])
+                
+                if not image_files:
+                    messagebox.showerror("Error", "No se encontraron imágenes válidas en el ZIP")
+                    return
+                
+                # Cargar datos en el formulario
+                self.title_entry.delete(0, tk.END)
+                self.title_entry.insert(0, post_data["title"])
+                
+                # Seleccionar mapa
+                map_id = post_data["mapId"]
+                if map_id in MAPS:
+                    self.map_combo.set(map_id)
+                
+                # Resetear todos los checkboxes
+                for var in self.side_vars.values():
+                    var.set(False)
+                for var in self.site_vars.values():
+                    var.set(False)
+                for var in self.util_vars.values():
+                    var.set(False)
+                for var in self.method_vars.values():
+                    var.set(False)
+                
+                # Marcar tags
+                for tag in post_data["tags"]:
+                    if tag in self.side_vars:
+                        self.side_vars[tag].set(True)
+                    elif tag in self.site_vars:
+                        self.site_vars[tag].set(True)
+                    elif tag in self.util_vars:
+                        self.util_vars[tag].set(True)
+                
+                # Marcar métodos
+                for method in post_data["method"]:
+                    if method in self.method_vars:
+                        self.method_vars[method].set(True)
+                
+                # Copiar imágenes al directorio temporal persistente
+                persistent_images = []
+                for img in image_files:
+                    dest = self.temp_dir / img.name
+                    shutil.copy2(img, dest)
+                    persistent_images.append(str(dest))
+                
+                # Cargar imágenes
+                self.images = persistent_images
+                self.update_image_list()
+                
+                messagebox.showinfo(
+                    "Éxito",
+                    f"Post importado correctamente!\n\nTítulo: {post_data['title']}\nImágenes: {len(image_files)}\n\nAhora puedes crear el post o modificarlo."
+                )
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo importar:\n{str(e)}")
     
     def create_post(self):
         # Validar
