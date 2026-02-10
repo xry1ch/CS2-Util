@@ -76,7 +76,7 @@ export const dust2Posts: MapPost[] = [
     mapId: 'de_dust2',
     title: 'MID',
     images: ['dust2/mid-t-smoke-1.jpg', 'dust2/mid-t-smoke-2.jpg', 'dust2/mid-t-smoke-3.jpg'],
-    tags: ['T', 'B', 'SMOKE'],
-    method: ['THROW', 'DOUBLE', 'JUMP'],
+    tags: ['T', 'A', 'SMOKE'],
+    method: ['THROW', 'JUMP'],
   },
 ]
