@@ -1,6 +1,14 @@
 import { ArrowLeft, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import JSZip from 'jszip'
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ThemeSwitch } from '@/components/ui/theme-switch'
 import { posts, type MapPost } from '@/data/posts'
 
@@ -49,6 +57,12 @@ const postImages = import.meta.glob(
 const sideOptions = ['CT', 'T']
 const siteOptions = ['A', 'MID', 'B']
 const tags = ['SMOKE', 'MOLO', 'FLASH', 'NADE']
+const methodComponents = ['THROW', 'DOUBLE', 'JUMP', 'CROUCH', 'WALK', 'RUN']
+const sanitizeTitle = (value: string) =>
+  value
+    .replace(/[^a-zA-Z0-9 ]+/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, 24)
 
 function App() {
   const [isDark, setIsDark] = useState(() => {
@@ -67,6 +81,16 @@ function App() {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [exportTitle, setExportTitle] = useState('')
+  const [exportMapId, setExportMapId] = useState(() => maps[0]?.id ?? '')
+  const [exportMethod, setExportMethod] = useState<Set<string>>(new Set())
+  const [exportSide, setExportSide] = useState<string | null>(null)
+  const [exportSite, setExportSite] = useState<string | null>(null)
+  const [exportUtils, setExportUtils] = useState<string | null>(null)
+  const [exportImages, setExportImages] = useState<File[]>([])
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   const selectedMap = selectedMapId
     ? maps.find((map) => map.id === selectedMapId) ?? null
@@ -82,6 +106,37 @@ function App() {
       next.add(tag)
       return next
     })
+  }
+
+  const toggleExportSet = (
+    value: string,
+    setter: Dispatch<SetStateAction<Set<string>>>
+  ) => {
+    setter((current) => {
+      const next = new Set(current)
+      if (next.has(value)) {
+        next.delete(value)
+      } else {
+        next.add(value)
+      }
+      return next
+    })
+  }
+
+  const resetExportForm = () => {
+    setExportTitle('')
+    setExportMapId(maps[0]?.id ?? '')
+    setExportMethod(new Set())
+    setExportSide(null)
+    setExportSite(null)
+    setExportUtils(null)
+    setExportImages([])
+    setExportError(null)
+  }
+
+  const closeExportModal = () => {
+    setIsExportOpen(false)
+    resetExportForm()
   }
 
   const filteredPosts = useMemo(() => {
@@ -102,6 +157,118 @@ function App() {
 
   const resolvePostImage = (path: string) =>
     postImages[`./assets/posts/${path}`]
+
+  const handleExportFiles = (files: FileList | null) => {
+    if (!files) return
+    const nextFiles = Array.from(files).filter((file) =>
+      file.type.startsWith('image/')
+    )
+
+    if (nextFiles.length === 0) {
+      setExportError('Solo se permiten imagenes.')
+      return
+    }
+
+    setExportError(null)
+
+    setExportImages((current) => {
+      const combined = [...current, ...nextFiles]
+      if (combined.length > 2) {
+        setExportError('Maximo 2 imagenes.')
+        return combined.slice(0, 2)
+      }
+      return combined
+    })
+  }
+
+  const handleExport = async () => {
+    setExportError(null)
+
+    if (!exportTitle.trim()) {
+      setExportError('Debes ingresar un titulo.')
+      return
+    }
+
+    if (!exportMapId) {
+      setExportError('Debes seleccionar un mapa.')
+      return
+    }
+
+    if (exportMethod.size === 0) {
+      setExportError('Debes seleccionar al menos un componente de metodo.')
+      return
+    }
+
+    const exportTags = [exportSide, exportSite, exportUtils].filter(
+      (tag): tag is string => Boolean(tag)
+    )
+
+    if (exportTags.length === 0) {
+      setExportError('Debes seleccionar al menos un tag.')
+      return
+    }
+
+    if (exportImages.length === 0) {
+      setExportError('Debes subir al menos una imagen.')
+      return
+    }
+
+    if (exportImages.length > 2) {
+      setExportError('Maximo 2 imagenes.')
+      return
+    }
+
+    setIsExporting(true)
+
+    try {
+      const zip = new JSZip()
+      const jsonData = {
+        mapId: exportMapId,
+        title: exportTitle.trim(),
+        tags: exportTags,
+        method: Array.from(exportMethod),
+        imageCount: exportImages.length,
+        images: exportImages.map((file) => file.name),
+      }
+
+      zip.file('post.json', JSON.stringify(jsonData, null, 2))
+
+      const imagesFolder = zip.folder('images')
+      exportImages.forEach((file, index) => {
+        const nameExt = file.name.match(/\.[^/.]+$/)?.[0]
+        const typeExt = file.type.includes('/')
+          ? `.${file.type.split('/')[1]}`
+          : ''
+        const extension = nameExt ?? typeExt
+        imagesFolder?.file(`image_${index + 1}${extension}`, file)
+      })
+
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const slug = exportTitle
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+      const downloadName = slug ? `cs2-post-${slug}.zip` : 'cs2-post.zip'
+
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = downloadName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+
+      setIsExportOpen(false)
+      resetExportForm()
+    } catch (error) {
+      console.error(error)
+      setExportError('No se pudo generar el archivo. Intentalo de nuevo.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
@@ -170,10 +337,19 @@ function App() {
               {selectedMap ? selectedMap.label : 'Selecciona un mapa'}
             </h1>
           </div>
-          <ThemeSwitch
-            isDark={isDark}
-            onToggle={() => setIsDark((current) => !current)}
-          />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsExportOpen(true)}
+            >
+              Crear Post
+            </Button>
+            <ThemeSwitch
+              isDark={isDark}
+              onToggle={() => setIsDark((current) => !current)}
+            />
+          </div>
         </div>
         {selectedMap ? (
           <section className="flex flex-col gap-8">
@@ -419,6 +595,243 @@ function App() {
                   {tag}
                 </span>
               ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {isExportOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8"
+          onClick={closeExportModal}
+        >
+          <div
+            className="relative w-full max-w-2xl rounded-2xl border border-border bg-background shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Crear post
+                </p>
+                <h2 className="text-2xl font-semibold text-foreground">
+                  Nuevo post
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={closeExportModal}
+                aria-label="Cerrar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-6 px-6 py-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Titulo
+                </label>
+                <input
+                  type="text"
+                  value={exportTitle}
+                  onChange={(event) =>
+                    setExportTitle(sanitizeTitle(event.target.value))
+                  }
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Ej: Smoke A Site"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Mapa
+                  </label>
+                  <Select value={exportMapId} onValueChange={setExportMapId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un mapa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {maps.map((map) => (
+                        <SelectItem key={map.id} value={map.id}>
+                          {map.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Metodo
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {methodComponents.map((method) => {
+                      const isSelected = exportMethod.has(method)
+                      return (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => toggleExportSet(method, setExportMethod)}
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {method}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Side
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {sideOptions.map((option) => {
+                      const isSelected = exportSide === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setExportSide((current) =>
+                              current === option ? null : option
+                            )
+                          }
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Site
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {siteOptions.map((option) => {
+                      const isSelected = exportSite === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setExportSite((current) =>
+                              current === option ? null : option
+                            )
+                          }
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Utilidades
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((option) => {
+                      const isSelected = exportUtils === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setExportUtils((current) =>
+                              current === option ? null : option
+                            )
+                          }
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">
+                    Imagenes (max 2)
+                  </label>
+                  <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    {exportImages.length}/2
+                  </label>
+                </div>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  multiple
+                  onChange={(event) => {
+                    handleExportFiles(event.target.files)
+                    event.currentTarget.value = ''
+                  }}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+                <div className="space-y-2">
+                  {exportImages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Sube una o dos imagenes en orden.
+                    </p>
+                  ) : (
+                    exportImages.map((file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                      >
+                        <span className="text-sm text-foreground">
+                          {index + 1}. {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExportImages((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index)
+                            )
+                          }
+                          className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              {exportError ? (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {exportError}
+                </div>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+              <Button variant="outline" onClick={closeExportModal}>
+                Cancelar
+              </Button>
+              <Button onClick={handleExport} disabled={isExporting}>
+                {isExporting ? 'Generando...' : 'Descargar post'}
+              </Button>
             </div>
           </div>
         </div>
