@@ -1,14 +1,15 @@
 import type { MapPost } from './types'
 
 export const infernoPosts: MapPost[] = [
-  {
+    {
     id: 'de_inferno-20260210111751',
     mapId: 'de_inferno',
     title: 'LONG',
-    images: ['inferno/long-t-smoke-1.jpg', 'inferno/long-t-smoke-2.jpg'],
+    images: ['inferno/long-t-smoke-1.jpg', 'inferno/long-t-smoke-2.jpg', 'inferno/long-t-smoke-3.jpg'],
     tags: ['T', 'A', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
+
   {
     id: 'de_inferno-20260210111940',
     mapId: 'de_inferno',

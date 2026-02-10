@@ -47,6 +47,7 @@ class PostCreatorApp:
         self.root.resizable(False, False)
         
         self.images = []
+        self.imported_post_data = None  # Almacenar datos de post importado
         # Directorio temporal que persiste durante la sesión
         self.temp_dir = Path(tempfile.mkdtemp(prefix="cs2_post_"))
         
@@ -454,6 +455,9 @@ class PostCreatorApp:
                 self.images = persistent_images
                 self.update_image_list()
                 
+                # Guardar datos del post importado para usarlos al crear
+                self.imported_post_data = post_data
+                
                 messagebox.showinfo(
                     "Éxito",
                     f"Post importado correctamente!\n\nTítulo: {post_data['title']}\nImágenes: {len(image_files)}\n\nAhora puedes crear el post o modificarlo."
@@ -501,11 +505,18 @@ class PostCreatorApp:
             messagebox.showerror("Error", "Debes seleccionar al menos un tag")
             return
         
+        # Si se importó un post, usar su ID; si no, generar uno nuevo
+        if self.imported_post_data and "id" in self.imported_post_data:
+            post_id = self.imported_post_data["id"]
+        else:
+            # Generar ID basado en mapId + title (sin timestamp)
+            sanitized_title = re.sub(r'[^\w\s-]', '', title.lower())
+            sanitized_title = re.sub(r'[\s]+', '-', sanitized_title.strip())
+            post_id = f"{map_id}-{sanitized_title}"
+        
         # Generar nombre base para las imágenes
         sanitized_title = re.sub(r'[^\w\s-]', '', title.lower())
         sanitized_title = re.sub(r'[\s]+', '-', sanitized_title.strip())
-        
-        # Agregar tags importantes (side y utility)
         name_parts = [sanitized_title]
         for side, var in self.side_vars.items():
             if var.get():
@@ -515,10 +526,6 @@ class PostCreatorApp:
                 name_parts.append(util.lower())
         
         base_name = "-".join(name_parts)
-        
-        # Generar ID único
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        post_id = f"{map_id}-{timestamp}"
         
         # Nombre del mapa sin "de_"
         map_name = map_id.replace("de_", "")
@@ -556,42 +563,60 @@ class PostCreatorApp:
             with open(ts_file, "r", encoding="utf-8") as f:
                 content = f.read()
             
-            # Buscar el patrón de array vacío: = []
-            if "= []" in content:
-                # Convertir array vacío a array con contenido
-                post_lines = post_entry.split('\n')
-                new_content = post_lines[0]  # Primera línea del post sin \n
-                for line in post_lines[1:]:
-                    new_content += '\n' + line
-                
-                # Reemplazar = [] con = [post, ]
-                content = content.replace("= []", f"= [\n{post_entry}\n]")
-            else:
-                # Array ya tiene contenido, insertar antes del cierre
-                # Buscar el patrón ]$ (cierre del array al final)
-                lines = content.split('\n')
-                
-                insert_idx = -1
-                for i in range(len(lines) - 1, -1, -1):
-                    if lines[i].strip() == ']':
-                        insert_idx = i
+            # Verificar si el post ya existe (buscar por ID)
+            is_update = f"id: '{post_id}'" in content
+            
+            if is_update:
+                # Reemplazar post existente
+                import_lines = []
+                for line in content.split('\n'):
+                    if line.strip().startswith("id: '" + post_id + "'"):
+                        # Encontramos el post a reemplazar
+                        # Buscamos desde aquí hasta el siguiente },
+                        start_idx = content.find(f"id: '{post_id}'")
+                        # Retroceder para encontrar el {
+                        start_idx = content.rfind('{', 0, start_idx)
+                        # Avanzar para encontrar el siguiente },
+                        end_idx = content.find('},', start_idx) + 2
+                        
+                        # Reemplazar el post completo
+                        content = content[:start_idx] + post_entry + '\n' + content[end_idx:]
                         break
-                
-                if insert_idx == -1:
-                    messagebox.showerror("Error", f"No se pudo encontrar el cierre del array en {ts_file}")
-                    return
-                
-                # Insertar el nuevo post antes del cierre
-                lines.insert(insert_idx, post_entry)
-                content = '\n'.join(lines)
+            else:
+                # Crear nuevo post
+                # Buscar el patrón de array vacío: = []
+                if "= []" in content:
+                    # Convertir array vacío a array con contenido
+                    content = content.replace("= []", f"= [\n{post_entry}\n]")
+                else:
+                    # Array ya tiene contenido, insertar antes del cierre
+                    lines = content.split('\n')
+                    
+                    insert_idx = -1
+                    for i in range(len(lines) - 1, -1, -1):
+                        if lines[i].strip() == ']':
+                            insert_idx = i
+                            break
+                    
+                    if insert_idx == -1:
+                        messagebox.showerror("Error", f"No se pudo encontrar el cierre del array en {ts_file}")
+                        return
+                    
+                    # Insertar el nuevo post antes del cierre
+                    lines.insert(insert_idx, post_entry)
+                    content = '\n'.join(lines)
             
             with open(ts_file, "w", encoding="utf-8") as f:
                 f.write(content)
             
+            action = "actualizado" if is_update else "creado"
             messagebox.showinfo(
                 "Éxito",
-                f"Post creado correctamente!\n\nID: {post_id}\nImágenes: {len(image_paths)}\nNombre: {base_name}",
+                f"Post {action} correctamente!\n\nID: {post_id}\nMapa: {map_id}\nTítulo: {title}\nImágenes: {len(image_paths)}\n\nEl archivo TypeScript ha sido actualizado automáticamente."
             )
+            
+            # Limpiar datos de post importado
+            self.imported_post_data = None
             
             # Resetear form
             self.title_entry.delete(0, tk.END)

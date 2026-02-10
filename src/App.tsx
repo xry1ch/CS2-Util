@@ -91,6 +91,10 @@ function App() {
   const [exportImages, setExportImages] = useState<File[]>([])
   const [exportError, setExportError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editPostImages, setEditPostImages] = useState<File[]>([])
+  const [editError, setEditError] = useState<string | null>(null)
+  const [isEditExporting, setIsEditExporting] = useState(false)
 
   const selectedMap = selectedMapId
     ? maps.find((map) => map.id === selectedMapId) ?? null
@@ -173,9 +177,9 @@ function App() {
 
     setExportImages((current) => {
       const combined = [...current, ...nextFiles]
-      if (combined.length > 2) {
-        setExportError('Maximo 2 imagenes.')
-        return combined.slice(0, 2)
+      if (combined.length > 3) {
+        setExportError('Maximo 3 imagenes.')
+        return combined.slice(0, 3)
       }
       return combined
     })
@@ -213,8 +217,8 @@ function App() {
       return
     }
 
-    if (exportImages.length > 2) {
-      setExportError('Maximo 2 imagenes.')
+    if (exportImages.length > 3) {
+      setExportError('Maximo 3 imagenes.')
       return
     }
 
@@ -267,6 +271,127 @@ function App() {
       setExportError('No se pudo generar el archivo. Intentalo de nuevo.')
     } finally {
       setIsExporting(false)
+    }
+  }
+
+  const handleEditFiles = (files: FileList | null) => {
+    if (!files) return
+    const nextFiles = Array.from(files).filter((file) =>
+      file.type.startsWith('image/')
+    )
+
+    if (nextFiles.length === 0) {
+      setEditError('Solo se permiten imagenes.')
+      return
+    }
+
+    setEditError(null)
+
+    const maxAllowed = 3 - (activePost?.images.length ?? 0)
+    const filesToAdd = nextFiles.slice(0, Math.max(0, maxAllowed))
+
+    if (filesToAdd.length === 0) {
+      setEditError(
+        `Ya tienes ${activePost?.images.length} imagenes. Maximo 3 en total.`
+      )
+      return
+    }
+
+    setEditPostImages((current) => {
+      const combined = [...current, ...filesToAdd]
+      if (combined.length > maxAllowed) {
+        setEditError(
+          `Puedes agregar hasta ${maxAllowed} imagenes mas (maximo 3 en total).`
+        )
+        return combined.slice(0, maxAllowed)
+      }
+      return combined
+    })
+  }
+
+  const handleEditExport = async () => {
+    setEditError(null)
+
+    if (!activePost) {
+      setEditError('No hay post cargado.')
+      return
+    }
+
+    const currentImageCount = activePost.images.length + editPostImages.length
+    if (currentImageCount === 0) {
+      setEditError('Debes tener al menos una imagen.')
+      return
+    }
+
+    setIsEditExporting(true)
+
+    try {
+      const zip = new JSZip()
+      const jsonData = {
+        id: activePost.id,
+        mapId: activePost.mapId,
+        title: activePost.title,
+        tags: activePost.tags,
+        method: activePost.method,
+        imageCount: currentImageCount,
+        images: [
+          ...activePost.images,
+          ...editPostImages.map((file) => file.name),
+        ],
+      }
+
+      zip.file('post.json', JSON.stringify(jsonData, null, 2))
+
+      const imagesFolder = zip.folder('images')
+
+      // Agregar imágenes existentes
+      for (let i = 0; i < activePost.images.length; i++) {
+        const imagePath = activePost.images[i]
+        const imageUrl = resolvePostImage(imagePath)
+        if (imageUrl) {
+          const response = await fetch(imageUrl)
+          const blob = await response.blob()
+          const ext = imagePath.match(/\.[^/.]+$/)?.[0] || ''
+          imagesFolder?.file(`image_${i + 1}${ext}`, blob)
+        }
+      }
+
+      // Agregar nuevas imágenes
+      editPostImages.forEach((file, index) => {
+        const nameExt = file.name.match(/\.[^/.]+$/)?.[0]
+        const typeExt = file.type.includes('/')
+          ? `.${file.type.split('/')[1]}`
+          : ''
+        const extension = nameExt ?? typeExt
+        const imageIndex = activePost.images.length + index + 1
+        imagesFolder?.file(`image_${imageIndex}${extension}`, file)
+      })
+
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const slug = activePost.title
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+      const downloadName = slug ? `cs2-post-${slug}.zip` : 'cs2-post.zip'
+
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = downloadName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+
+      setActivePost(null)
+      setIsEditMode(false)
+      setEditPostImages([])
+    } catch (error) {
+      console.error(error)
+      setEditError('No se pudo generar el archivo. Intentalo de nuevo.')
+    } finally {
+      setIsEditExporting(false)
     }
   }
 
@@ -552,17 +677,34 @@ function App() {
                   </span>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setActivePost(null)}
-                aria-label="Cerrar"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditMode(true)}
+                >
+                  Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setActivePost(null)}
+                  aria-label="Cerrar"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="grid gap-4 px-6 py-6 md:grid-cols-2">
-              {activePost.images.slice(0, 2).map((image, index) => {
+            <div
+              className={`grid gap-4 px-6 py-6 ${
+                activePost.images.length === 1
+                  ? 'md:grid-cols-1'
+                  : activePost.images.length === 2
+                    ? 'md:grid-cols-2'
+                    : 'md:grid-cols-2 lg:grid-cols-3'
+              }`}
+            >
+              {activePost.images.slice(0, 3).map((image, index) => {
                 const imageUrl = resolvePostImage(image)
                 return (
                   <button
@@ -595,6 +737,136 @@ function App() {
                   {tag}
                 </span>
               ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {isEditMode && activePost ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8"
+          onClick={() => setIsEditMode(false)}
+        >
+          <div
+            className="relative w-full max-w-2xl rounded-2xl border border-border bg-background shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Editar
+                </p>
+                <h2 className="text-2xl font-semibold text-foreground">
+                  {activePost.title}
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsEditMode(false)}
+                aria-label="Cerrar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-6 px-6 py-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">
+                    Imagenes actuales
+                  </label>
+                  <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    {activePost.images.length}/3
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {activePost.images.map((image, index) => (
+                    <div
+                      key={`current-${image}-${index}`}
+                      className="rounded-md border border-border px-3 py-2 text-sm text-foreground"
+                    >
+                      {index + 1}. {image}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">
+                    Agregar imagenes
+                  </label>
+                  <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    {editPostImages.length}/{Math.max(
+                      0,
+                      3 - activePost.images.length
+                    )}
+                  </label>
+                </div>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  multiple
+                  onChange={(event) => {
+                    handleEditFiles(event.target.files)
+                    event.currentTarget.value = ''
+                  }}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  disabled={activePost.images.length >= 3}
+                />
+                <div className="space-y-2">
+                  {editPostImages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {activePost.images.length >= 3
+                        ? 'Ya tienes el maximo de imagenes.'
+                        : `Sube hasta ${3 - activePost.images.length} imagenes mas.`}
+                    </p>
+                  ) : (
+                    editPostImages.map((file, index) => (
+                      <div
+                        key={`new-${file.name}-${index}`}
+                        className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                      >
+                        <span className="text-sm text-foreground">
+                          {activePost.images.length + index + 1}. {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditPostImages((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index)
+                            )
+                          }
+                          className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              {editError ? (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {editError}
+                </div>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditMode(false)
+                  setEditPostImages([])
+                  setEditError(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleEditExport}
+                disabled={isEditExporting || editPostImages.length === 0}
+              >
+                {isEditExporting ? 'Generando...' : 'Descargar actualizado'}
+              </Button>
             </div>
           </div>
         </div>
@@ -773,10 +1045,10 @@ function App() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-foreground">
-                    Imagenes (max 2)
+                    Imagenes (max 3)
                   </label>
                   <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {exportImages.length}/2
+                    {exportImages.length}/3
                   </label>
                 </div>
                 <input
@@ -792,7 +1064,7 @@ function App() {
                 <div className="space-y-2">
                   {exportImages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Sube una o dos imagenes en orden.
+                      Sube hasta 3 imagenes en orden.
                     </p>
                   ) : (
                     exportImages.map((file, index) => (
