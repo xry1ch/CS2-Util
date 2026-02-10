@@ -1,76 +1,85 @@
 import type { MapPost } from './types'
 
 export const ancientPosts: MapPost[] = [
-  {
+    {
     id: 'de_ancient-20260210123912',
     mapId: 'de_ancient',
     title: 'DONUT',
-    images: ['ancient/donut-t-smoke-1.jpg', 'ancient/donut-t-smoke-2.jpg'],
+    images: ['ancient/donut-t-smoke-1.jpg', 'ancient/donut-t-smoke-2.jpg', 'ancient/donut-t-smoke-3.jpg'],
     tags: ['T', 'A', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210123926',
     mapId: 'de_ancient',
     title: 'CT',
-    images: ['ancient/ct-t-smoke-1.jpg', 'ancient/ct-t-smoke-2.jpg'],
+    images: ['ancient/ct-t-smoke-1.jpg', 'ancient/ct-t-smoke-2.jpg', 'ancient/ct-t-smoke-3.jpg'],
     tags: ['T', 'A', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210124001',
     mapId: 'de_ancient',
     title: 'TEMPLE',
-    images: ['ancient/temple-t-smoke-1.jpg', 'ancient/temple-t-smoke-2.jpg'],
+    images: ['ancient/temple-t-smoke-1.jpg', 'ancient/temple-t-smoke-2.jpg', 'ancient/temple-t-smoke-3.jpg'],
     tags: ['T', 'A', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210124028',
     mapId: 'de_ancient',
     title: 'SUN',
-    images: ['ancient/sun-t-smoke-1.jpg', 'ancient/sun-t-smoke-2.jpg'],
+    images: ['ancient/sun-t-smoke-1.jpg', 'ancient/sun-t-smoke-2.jpg', 'ancient/sun-t-smoke-3.jpg'],
     tags: ['T', 'B', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210124043',
     mapId: 'de_ancient',
     title: 'MOON',
-    images: ['ancient/moon-t-smoke-1.jpg', 'ancient/moon-t-smoke-2.jpg'],
+    images: ['ancient/moon-t-smoke-1.jpg', 'ancient/moon-t-smoke-2.jpg', 'ancient/moon-t-smoke-3.jpg'],
     tags: ['T', 'B', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210124055',
     mapId: 'de_ancient',
     title: 'CHEETAH',
-    images: ['ancient/cheetah-t-smoke-1.jpg', 'ancient/cheetah-t-smoke-2.jpg'],
+    images: ['ancient/cheetah-t-smoke-1.jpg', 'ancient/cheetah-t-smoke-2.jpg', 'ancient/cheetah-t-smoke-3.jpg'],
     tags: ['T', 'B', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210124111',
     mapId: 'de_ancient',
     title: 'RAMP',
-    images: ['ancient/ramp-ct-molo-1.jpg', 'ancient/ramp-ct-molo-2.jpg'],
+    images: ['ancient/ramp-ct-molo-1.jpg', 'ancient/ramp-ct-molo-2.jpg', 'ancient/ramp-ct-molo-3.jpg'],
     tags: ['CT', 'B', 'MOLO'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210124331',
     mapId: 'de_ancient',
     title: 'HEAVEN / CHEETAH RUSH STOP',
-    images: ['ancient/heaven-cheetah-rush-stop-ct-molo-1.jpg', 'ancient/heaven-cheetah-rush-stop-ct-molo-2.jpg'],
+    images: ['ancient/heaven-cheetah-rush-stop-ct-molo-1.jpg', 'ancient/heaven-cheetah-rush-stop-ct-molo-2.jpg', 'ancient/heaven-cheetah-rush-stop-ct-molo-3.jpg'],
     tags: ['CT', 'B', 'MOLO'],
-    method: ['JUMP', 'RUN', 'DOUBLE', 'THROW'],
+    method: ['THROW', 'DOUBLE', 'JUMP', 'RUN'],
   },
-  {
+
+    {
     id: 'de_ancient-20260210124359',
     mapId: 'de_ancient',
     title: 'RED ROOM',
-    images: ['ancient/red-room-t-smoke-1.jpg', 'ancient/red-room-t-smoke-2.jpg'],
+    images: ['ancient/red-room-t-smoke-1.jpg', 'ancient/red-room-t-smoke-2.jpg', 'ancient/red-room-t-smoke-3.jpg'],
     tags: ['T', 'MID', 'SMOKE'],
-    method: ['JUMP', 'THROW'],
+    method: ['THROW', 'JUMP'],
   },
+
 ]
