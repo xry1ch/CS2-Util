@@ -1,6 +1,4 @@
 ![CS2 Util Header](./src/assets/header.png)
-A visual guide for Counter-Strike 2 utility lineups and tactics. Browse through different maps to discover smoke throws, grenade positions, and strategic plays to improve your game.
-
 ## 🎯 What is this?
 
 CS2 Util is an interactive web app that helps CS2 players learn and master utility throws across competitive maps. Each lineup includes visual references showing exactly where to stand and how to throw your grenades.
