@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react'
+import { Flame, Cloud, Zap, Bomb } from 'lucide-react'
 import type { MapPost } from '@/data/posts'
+
+const tagIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  MOLO: Flame,
+  SMOKE: Cloud,
+  FLASH: Zap,
+  NADE: Bomb,
+}
 
 interface PostCardProps {
   post: MapPost
@@ -104,14 +112,18 @@ export function PostCard({
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
-          {post.tags.map((tag) => (
-            <span
-              key={`${post.id}-${tag}`}
-              className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground"
-            >
-              {tag}
-            </span>
-          ))}
+          {post.tags.map((tag) => {
+            const IconComponent = tagIcons[tag]
+            return (
+              <span
+                key={`${post.id}-${tag}`}
+                className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1"
+              >
+                {IconComponent && <IconComponent className="h-3 w-3" />}
+                {tag}
+              </span>
+            )
+          })}
         </div>
       </div>
     </button>

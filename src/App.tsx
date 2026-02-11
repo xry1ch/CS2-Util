@@ -1,4 +1,4 @@
-import { ArrowLeft, X, Map, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
+import { ArrowLeft, X, Map, ChevronUp, ChevronDown, Trash2, Flame, Cloud, Zap, Bomb } from 'lucide-react'
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
@@ -66,6 +66,13 @@ const calloutsImages = import.meta.glob('./assets/callouts/*.{png,jpg,jpeg,webp,
 const sideOptions = ['CT', 'T']
 const siteOptions = ['A', 'MID', 'B']
 const tags = ['SMOKE', 'MOLO', 'FLASH', 'NADE']
+
+const tagIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  MOLO: Flame,
+  SMOKE: Cloud,
+  FLASH: Zap,
+  NADE: Bomb,
+}
 const methodComponents = ['THROW', 'DOUBLE', 'JUMP', 'CROUCH', 'WALK', 'RUN', 'W TAP']
 const methodOrder = ['CROUCH', 'JUMP', 'THROW', 'DOUBLE', 'WALK', 'RUN', 'W TAP']
 const MAX_IMAGES = 4
@@ -861,6 +868,7 @@ function App() {
               </div>
               {tags.map((tag) => {
                 const isSelected = selectedTags.has(tag)
+                const IconComponent = tagIcons[tag]
                 return (
                   <Button
                     key={tag}
@@ -868,6 +876,7 @@ function App() {
                     variant={isSelected ? 'default' : 'outline'}
                     onClick={() => toggleTag(tag)}
                   >
+                    {IconComponent && <IconComponent className="h-4 w-4" />}
                     {tag}
                   </Button>
                 )
@@ -1182,6 +1191,7 @@ function App() {
                   <div className="flex flex-wrap gap-2">
                     {tags.map((option) => {
                       const isSelected = editUtils === option
+                      const IconComponent = tagIcons[option]
                       return (
                         <button
                           key={option}
@@ -1191,12 +1201,13 @@ function App() {
                               current === option ? null : option
                             )
                           }
-                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition flex items-center gap-1 ${
                             isSelected
                               ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border text-muted-foreground hover:text-foreground'
                           }`}
                         >
+                          {IconComponent && <IconComponent className="h-3 w-3" />}
                           {option}
                         </button>
                       )
@@ -1507,6 +1518,7 @@ function App() {
                   <div className="flex flex-wrap gap-2">
                     {tags.map((option) => {
                       const isSelected = exportUtils === option
+                      const IconComponent = tagIcons[option]
                       return (
                         <button
                           key={option}
@@ -1516,12 +1528,13 @@ function App() {
                               current === option ? null : option
                             )
                           }
-                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition flex items-center gap-1 ${
                             isSelected
                               ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border text-muted-foreground hover:text-foreground'
                           }`}
                         >
+                          {IconComponent && <IconComponent className="h-3 w-3" />}
                           {option}
                         </button>
                       )
