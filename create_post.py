@@ -138,19 +138,24 @@ class PostCreatorApp:
         self.title_entry = tk.Entry(form, width=40)
         self.title_entry.grid(row=0, column=1, pady=5, sticky="ew")
         
+        # Tip (Opcional)
+        tk.Label(form, text="Tip (opcional):").grid(row=1, column=0, sticky="w", pady=5)
+        self.tip_entry = tk.Entry(form, width=40)
+        self.tip_entry.grid(row=1, column=1, pady=5, sticky="ew")
+        
         # Map
-        tk.Label(form, text="Mapa:").grid(row=1, column=0, sticky="w", pady=5)
+        tk.Label(form, text="Mapa:").grid(row=2, column=0, sticky="w", pady=5)
         self.map_var = tk.StringVar()
         self.map_combo = ttk.Combobox(
             form, textvariable=self.map_var, values=MAPS, state="readonly", width=37
         )
-        self.map_combo.grid(row=1, column=1, pady=5, sticky="ew")
+        self.map_combo.grid(row=2, column=1, pady=5, sticky="ew")
         self.map_combo.current(0)
         
         # Method Components
-        tk.Label(form, text="Método:").grid(row=2, column=0, sticky="nw", pady=5)
+        tk.Label(form, text="Método:").grid(row=3, column=0, sticky="nw", pady=5)
         method_frame = tk.Frame(form)
-        method_frame.grid(row=2, column=1, sticky="w", pady=5)
+        method_frame.grid(row=3, column=1, sticky="w", pady=5)
         self.method_vars = {}
         for i, component in enumerate(METHOD_COMPONENTS):
             var = tk.BooleanVar()
@@ -159,9 +164,9 @@ class PostCreatorApp:
             cb.grid(row=i // 3, column=i % 3, padx=5, sticky="w")
         
         # Tags - Sides
-        tk.Label(form, text="Side:").grid(row=3, column=0, sticky="w", pady=5)
+        tk.Label(form, text="Side:").grid(row=4, column=0, sticky="w", pady=5)
         side_frame = tk.Frame(form)
-        side_frame.grid(row=3, column=1, sticky="w", pady=5)
+        side_frame.grid(row=4, column=1, sticky="w", pady=5)
         self.side_vars = {}
         for i, side in enumerate(SIDES):
             var = tk.BooleanVar()
@@ -170,9 +175,9 @@ class PostCreatorApp:
             cb.grid(row=0, column=i, padx=5)
         
         # Tags - Sites
-        tk.Label(form, text="Site:").grid(row=4, column=0, sticky="w", pady=5)
+        tk.Label(form, text="Site:").grid(row=5, column=0, sticky="w", pady=5)
         site_frame = tk.Frame(form)
-        site_frame.grid(row=4, column=1, sticky="w", pady=5)
+        site_frame.grid(row=5, column=1, sticky="w", pady=5)
         self.site_vars = {}
         for i, site in enumerate(SITES):
             var = tk.BooleanVar()
@@ -181,9 +186,9 @@ class PostCreatorApp:
             cb.grid(row=0, column=i, padx=5)
         
         # Tags - Utilities
-        tk.Label(form, text="Utilidades:").grid(row=5, column=0, sticky="nw", pady=5)
+        tk.Label(form, text="Utilidades:").grid(row=6, column=0, sticky="nw", pady=5)
         util_frame = tk.Frame(form)
-        util_frame.grid(row=5, column=1, sticky="w", pady=5)
+        util_frame.grid(row=6, column=1, sticky="w", pady=5)
         self.util_vars = {}
         for i, util in enumerate(UTILITIES):
             var = tk.BooleanVar()
@@ -422,6 +427,11 @@ class PostCreatorApp:
                 self.title_entry.delete(0, tk.END)
                 self.title_entry.insert(0, post_data["title"])
                 
+                # Cargar tip si existe
+                self.tip_entry.delete(0, tk.END)
+                if "tip" in post_data and post_data["tip"]:
+                    self.tip_entry.insert(0, post_data["tip"])
+                
                 # Seleccionar mapa
                 map_id = post_data["mapId"]
                 if map_id in MAPS:
@@ -483,6 +493,8 @@ class PostCreatorApp:
         if not title:
             messagebox.showerror("Error", "Debes ingresar un título")
             return
+        
+        tip = self.tip_entry.get().strip()
         
         map_id = self.map_var.get()
         
@@ -552,14 +564,19 @@ class PostCreatorApp:
         images_str = ", ".join([f"'{p}'" for p in image_paths])
         method_str = ", ".join([f"'{m}'" for m in method])
         
+        # Construir el post entry con tip opcional
         post_entry = f"""  {{
     id: '{post_id}',
     mapId: '{map_id}',
     title: '{title}',
     images: [{images_str}],
     tags: [{tags_str}],
-    method: [{method_str}],
-  }},"""
+    method: [{method_str}],"""
+        
+        if tip:
+            post_entry += f"\n    tip: '{tip}',"
+        
+        post_entry += "\n  },"
         
         # Actualizar archivo TypeScript
         ts_file = POSTS_DIR / f"{map_name}.ts"

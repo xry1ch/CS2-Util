@@ -167,6 +167,7 @@ function App() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [exportTitle, setExportTitle] = useState('')
+  const [exportTip, setExportTip] = useState('')
   const [exportMapId, setExportMapId] = useState(() => maps[0]?.id ?? '')
   const [exportMethod, setExportMethod] = useState<Set<string>>(new Set())
   const [exportSide, setExportSide] = useState<string | null>(null)
@@ -177,6 +178,7 @@ function App() {
   const [isExporting, setIsExporting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editTitle, setEditTitle] = useState('')
+  const [editTip, setEditTip] = useState('')
   const [editMapId, setEditMapId] = useState('')
   const [editMethod, setEditMethod] = useState<Set<string>>(new Set())
   const [editSide, setEditSide] = useState<string | null>(null)
@@ -235,6 +237,7 @@ function App() {
 
   const resetEditForm = () => {
     setEditTitle('')
+    setEditTip('')
     setEditMapId('')
     setEditMethod(new Set())
     setEditSide(null)
@@ -254,6 +257,7 @@ function App() {
 
   const resetExportForm = () => {
     setExportTitle('')
+    setExportTip('')
     setExportMapId(maps[0]?.id ?? '')
     setExportMethod(new Set())
     setExportSide(null)
@@ -275,6 +279,7 @@ function App() {
     if (!isEditMode || !activePost) return
 
     setEditTitle(activePost.title)
+    setEditTip(activePost.tip ?? '')
     setEditMapId(activePost.mapId)
     setEditMethod(new Set(activePost.method))
     setEditSide(sideOptions.find((option) => activePost.tags.includes(option)) ?? null)
@@ -457,6 +462,7 @@ function App() {
         method: sortMethods(Array.from(exportMethod)),
         imageCount: orderedImages.length,
         images: orderedImages.map((image) => image.name),
+        ...(exportTip.trim() && { tip: exportTip.trim() }),
       }
 
       zip.file('post.json', JSON.stringify(jsonData, null, 2))
@@ -943,6 +949,11 @@ function App() {
                     {sortMethods(activePost.method).join(' ')}
                   </span>
                 </div>
+                {activePost.tip && (
+                  <p className="mt-2 text-sm text-muted-foreground italic">
+                    💡 {activePost.tip}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -1050,6 +1061,18 @@ function App() {
                   }
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="Ej: Smoke A Site"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Tip (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={editTip}
+                  onChange={(event) => setEditTip(event.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Ej: Útil para clutches en pistol... Ej: Mejor para el push inicial..."
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1363,6 +1386,18 @@ function App() {
                   }
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="Ej: Smoke A Site"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Tip (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={exportTip}
+                  onChange={(event) => setExportTip(event.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Ej: Útil para clutches en pistol... Ej: Mejor para el push inicial..."
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">

@@ -5,4 +5,5 @@ export type MapPost = {
   images: string[]
   tags: string[]
   method: string[]
+  tip?: string
 }
