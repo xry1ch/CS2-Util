@@ -74,7 +74,7 @@ type EditImageItem = {
 }
 const sanitizeTitle = (value: string) =>
   value
-    .replace(/[^a-zA-Z0-9 ]+/g, '')
+    .replace(/[^a-zA-Z0-9 /-]+/g, '')
     .replace(/\s{2,}/g, ' ')
     .slice(0, 24)
 
