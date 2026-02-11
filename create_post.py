@@ -38,7 +38,7 @@ MAPS = [
 SIDES = ["CT", "T"]
 SITES = ["A", "MID", "B"]
 UTILITIES = ["SMOKE", "MOLO", "FLASH", "NADE"]
-METHOD_COMPONENTS = ["THROW", "DOUBLE", "JUMP", "CROUCH", "WALK", "RUN"]
+METHOD_COMPONENTS = ["THROW", "DOUBLE", "JUMP", "CROUCH", "WALK", "RUN", "W TAP"]
 ID_ALPHABET = string.ascii_lowercase + string.digits
 
 
