@@ -61,11 +61,75 @@ const tags = ['SMOKE', 'MOLO', 'FLASH', 'NADE']
 const methodComponents = ['THROW', 'DOUBLE', 'JUMP', 'CROUCH', 'WALK', 'RUN']
 const methodOrder = ['CROUCH', 'JUMP', 'THROW', 'DOUBLE', 'WALK', 'RUN']
 const MAX_IMAGES = 4
+const OPTIMIZED_MAX_DIMENSION = 1920
+const OPTIMIZED_QUALITY = 0.9
+const OPTIMIZED_MIME = 'image/webp'
 const sanitizeTitle = (value: string) =>
   value
     .replace(/[^a-zA-Z0-9 ]+/g, '')
     .replace(/\s{2,}/g, ' ')
     .slice(0, 24)
+
+const getFileExtension = (name: string) => name.match(/\.[^/.]+$/)?.[0] ?? ''
+
+const getExtensionFromMime = (mime: string) =>
+  mime.includes('/') ? `.${mime.split('/')[1]}` : ''
+
+const buildImageName = (index: number, extension: string) =>
+  `image_${index + 1}${extension}`
+
+const loadImageFromBlob = (blob: Blob) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(blob)
+    const image = new Image()
+    image.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(image)
+    }
+    image.onerror = (error) => {
+      URL.revokeObjectURL(url)
+      reject(error)
+    }
+    image.src = url
+  })
+
+const getScaledDimensions = (
+  width: number,
+  height: number,
+  maxDimension: number
+) => {
+  const maxSide = Math.max(width, height)
+  if (maxSide <= maxDimension) {
+    return { width, height }
+  }
+  const scale = maxDimension / maxSide
+  return {
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+  }
+}
+
+const optimizeImageBlob = async (blob: Blob) => {
+  const image = await loadImageFromBlob(blob)
+  const { width, height } = getScaledDimensions(
+    image.naturalWidth,
+    image.naturalHeight,
+    OPTIMIZED_MAX_DIMENSION
+  )
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) return blob
+  context.drawImage(image, 0, 0, width, height)
+
+  const optimized = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, OPTIMIZED_MIME, OPTIMIZED_QUALITY)
+  })
+
+  return optimized ?? blob
+}
 
 function App() {
   const [isDark, setIsDark] = useState(() => {
@@ -237,26 +301,34 @@ function App() {
     try {
       const zip = new JSZip()
       const postId = generatePostId(exportMapId)
+      const optimizedImages = await Promise.all(
+        exportImages.map(async (file, index) => {
+          const optimizedBlob = await optimizeImageBlob(file)
+          const extension =
+            getExtensionFromMime(optimizedBlob.type || file.type) ||
+            getFileExtension(file.name) ||
+            '.webp'
+          return {
+            name: buildImageName(index, extension),
+            blob: optimizedBlob,
+          }
+        })
+      )
       const jsonData = {
         id: postId,
         mapId: exportMapId,
         title: exportTitle.trim(),
         tags: exportTags,
         method: sortMethods(Array.from(exportMethod)),
-        imageCount: exportImages.length,
-        images: exportImages.map((file) => file.name),
+        imageCount: optimizedImages.length,
+        images: optimizedImages.map((image) => image.name),
       }
 
       zip.file('post.json', JSON.stringify(jsonData, null, 2))
 
       const imagesFolder = zip.folder('images')
-      exportImages.forEach((file, index) => {
-        const nameExt = file.name.match(/\.[^/.]+$/)?.[0]
-        const typeExt = file.type.includes('/')
-          ? `.${file.type.split('/')[1]}`
-          : ''
-        const extension = nameExt ?? typeExt
-        imagesFolder?.file(`image_${index + 1}${extension}`, file)
+      optimizedImages.forEach((image) => {
+        imagesFolder?.file(image.name, image.blob)
       })
 
       const blob = await zip.generateAsync({ type: 'blob' })
@@ -339,44 +411,59 @@ function App() {
 
     try {
       const zip = new JSZip()
+      const existingImages = await Promise.all(
+        activePost.images.map(async (imagePath, index) => {
+          const imageUrl = resolvePostImage(imagePath)
+          if (!imageUrl) return null
+          const response = await fetch(imageUrl)
+          const blob = await response.blob()
+          const optimizedBlob = await optimizeImageBlob(blob)
+          const extension =
+            getExtensionFromMime(optimizedBlob.type || blob.type) ||
+            getFileExtension(imagePath) ||
+            '.webp'
+          return {
+            index,
+            name: buildImageName(index, extension),
+            blob: optimizedBlob,
+          }
+        })
+      )
+      const newImages = await Promise.all(
+        editPostImages.map(async (file, index) => {
+          const imageIndex = activePost.images.length + index
+          const optimizedBlob = await optimizeImageBlob(file)
+          const extension =
+            getExtensionFromMime(optimizedBlob.type || file.type) ||
+            getFileExtension(file.name) ||
+            '.webp'
+          return {
+            index: imageIndex,
+            name: buildImageName(imageIndex, extension),
+            blob: optimizedBlob,
+          }
+        })
+      )
+      const optimizedImages = [...existingImages, ...newImages]
+        .filter((image): image is NonNullable<typeof image> => Boolean(image))
+        .sort((a, b) => a.index - b.index)
+
       const jsonData = {
         id: activePost.id,
         mapId: activePost.mapId,
         title: activePost.title,
         tags: activePost.tags,
         method: sortMethods(activePost.method),
-        imageCount: currentImageCount,
-        images: [
-          ...activePost.images,
-          ...editPostImages.map((file) => file.name),
-        ],
+        imageCount: optimizedImages.length,
+        images: optimizedImages.map((image) => image.name),
       }
 
       zip.file('post.json', JSON.stringify(jsonData, null, 2))
 
       const imagesFolder = zip.folder('images')
 
-      // Agregar imágenes existentes
-      for (let i = 0; i < activePost.images.length; i++) {
-        const imagePath = activePost.images[i]
-        const imageUrl = resolvePostImage(imagePath)
-        if (imageUrl) {
-          const response = await fetch(imageUrl)
-          const blob = await response.blob()
-          const ext = imagePath.match(/\.[^/.]+$/)?.[0] || ''
-          imagesFolder?.file(`image_${i + 1}${ext}`, blob)
-        }
-      }
-
-      // Agregar nuevas imágenes
-      editPostImages.forEach((file, index) => {
-        const nameExt = file.name.match(/\.[^/.]+$/)?.[0]
-        const typeExt = file.type.includes('/')
-          ? `.${file.type.split('/')[1]}`
-          : ''
-        const extension = nameExt ?? typeExt
-        const imageIndex = activePost.images.length + index + 1
-        imagesFolder?.file(`image_${imageIndex}${extension}`, file)
+      optimizedImages.forEach((image) => {
+        imagesFolder?.file(image.name, image.blob)
       })
 
       const blob = await zip.generateAsync({ type: 'blob' })
