@@ -82,4 +82,12 @@ export const ancientPosts: MapPost[] = [
     method: ['THROW', 'JUMP'],
   },
 
+  {
+    id: 'de_ancient-qlJWylLE',
+    mapId: 'de_ancient',
+    title: 'INSTA RED ROOM',
+    images: ['ancient/insta-red-room-t-smoke-1.png', 'ancient/insta-red-room-t-smoke-2.png', 'ancient/insta-red-room-t-smoke-3.png', 'ancient/insta-red-room-t-smoke-4.png'],
+    tags: ['T', 'MID', 'SMOKE'],
+    method: ['THROW', 'JUMP', 'RUN'],
+  },
 ]
