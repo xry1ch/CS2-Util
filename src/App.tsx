@@ -13,6 +13,7 @@ import {
 import { ThemeSwitch } from '@/components/ui/theme-switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Dropzone } from '@/components/ui/dropzone'
+import { PostCard } from '@/components/PostCard'
 import { posts, type MapPost } from '@/data/posts'
 
 const mapImages = import.meta.glob('./assets/maps/*.{png,jpg,jpeg,webp,avif}', {
@@ -882,50 +883,15 @@ function App() {
                   No hay posts para este mapa con esos filtros.
                 </div>
               ) : (
-                filteredPosts.map((post) => {
-                  const previewImage = resolvePostImage(post.images[0])
-                  return (
-                    <button
-                      key={post.id}
-                      type="button"
-                      className="group overflow-hidden rounded-xl border border-border bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
-                      onClick={() => setActivePost(post)}
-                    >
-                      {previewImage ? (
-                        <img
-                          src={previewImage}
-                          alt={post.title}
-                          className="h-44 w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="flex h-44 items-center justify-center bg-muted text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                          Sin imagen
-                        </div>
-                      )}
-                      <div className="space-y-2 px-4 py-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">
-                            {post.title}
-                          </p>
-                          <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                            {sortMethods(post.method).join(' ')}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {post.tags.map((tag) => (
-                            <span
-                              key={`${post.id}-${tag}`}
-                              className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })
+                filteredPosts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    resolveImage={resolvePostImage}
+                    methodLabel={sortMethods(post.method).join(' ')}
+                    onClick={() => setActivePost(post)}
+                  />
+                ))
               )}
             </div>
           </section>
