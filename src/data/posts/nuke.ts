@@ -49,14 +49,15 @@ export const nukePosts: MapPost[] = [
     tags: ['CT', 'A', 'MOLO'],
     method: ['THROW', 'RUN'],
   },
-  {
+    {
     id: 'de_nuke-MXX7jUFX',
     mapId: 'de_nuke',
     title: 'A SITE MOLO',
-    images: ['nuke/a-site-molo-t-molo-1.webp', 'nuke/a-site-molo-t-molo-2.webp'],
+    images: ['nuke/a-site-molo-t-molo-1.webp', 'nuke/a-site-molo-t-molo-2.webp', 'nuke/a-site-molo-t-molo-3.webp'],
     tags: ['T', 'A', 'MOLO'],
     method: ['THROW', 'JUMP'],
   },
+
   {
     id: 'de_nuke-VemMAdoI',
     mapId: 'de_nuke',

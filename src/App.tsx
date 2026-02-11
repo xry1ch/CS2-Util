@@ -1,4 +1,4 @@
-import { ArrowLeft, X } from 'lucide-react'
+import { ArrowLeft, X, Map } from 'lucide-react'
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ThemeSwitch } from '@/components/ui/theme-switch'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { posts, type MapPost } from '@/data/posts'
 
 const mapImages = import.meta.glob('./assets/maps/*.{png,jpg,jpeg,webp,avif}', {
@@ -54,6 +55,11 @@ const postImages = import.meta.glob(
     import: 'default',
   }
 ) as Record<string, string>
+
+const calloutsImages = import.meta.glob('./assets/callouts/*.{png,jpg,jpeg,webp,avif}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>
 
 const sideOptions = ['CT', 'T']
 const siteOptions = ['A', 'MID', 'B']
@@ -152,6 +158,7 @@ function App() {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [activePost, setActivePost] = useState<MapPost | null>(null)
   const [viewerImage, setViewerImage] = useState<string | null>(null)
+  const [isCalloutsOpen, setIsCalloutsOpen] = useState(false)
   const [zoom, setZoom] = useState(0.85)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -290,6 +297,11 @@ function App() {
 
   const resolvePostImage = (path: string) =>
     postImages[`./assets/posts/${path}`]
+
+  const getCalloutsImage = (mapId: string) => {
+    const fileName = `${mapId}.webp`
+    return calloutsImages[`./assets/callouts/${fileName}`]
+  }
 
   const generatePostId = (mapId: string): string => `${mapId}-${nanoid(8)}`
 
@@ -793,6 +805,16 @@ function App() {
                   </Button>
                 )
               })}
+              <div className="ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCalloutsOpen(true)}
+                >
+                  <Map className="h-4 w-4" />
+                  Callouts Map
+                </Button>
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredPosts.length === 0 ? (
@@ -1501,6 +1523,26 @@ function App() {
           </div>
         </div>
       ) : null}
+      <Dialog open={isCalloutsOpen} onOpenChange={setIsCalloutsOpen}>
+        <DialogContent onClose={() => setIsCalloutsOpen(false)} className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedMap ? `Callouts - ${selectedMap.label}` : 'Callouts Map'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center">
+            {selectedMap && getCalloutsImage(selectedMap.id) ? (
+              <img
+                src={getCalloutsImage(selectedMap.id)}
+                alt={`Callouts de ${selectedMap.label}`}
+                className="max-h-[70vh] w-auto rounded-lg"
+              />
+            ) : (
+              <p className="text-muted-foreground">No hay imagen de callouts disponible para este mapa.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       {viewerImage ? (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-8"
