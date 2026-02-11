@@ -1,4 +1,4 @@
-import { ArrowLeft, X, Map } from 'lucide-react'
+import { ArrowLeft, X, Map, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { ThemeSwitch } from '@/components/ui/theme-switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dropzone } from '@/components/ui/dropzone'
 import { posts, type MapPost } from '@/data/posts'
 
 const mapImages = import.meta.glob('./assets/maps/*.{png,jpg,jpeg,webp,avif}', {
@@ -170,7 +171,7 @@ function App() {
   const [exportSide, setExportSide] = useState<string | null>(null)
   const [exportSite, setExportSite] = useState<string | null>(null)
   const [exportUtils, setExportUtils] = useState<string | null>(null)
-  const [exportImages, setExportImages] = useState<File[]>([])
+  const [exportImages, setExportImages] = useState<EditImageItem[]>([])
   const [exportError, setExportError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -223,6 +224,14 @@ function App() {
     })
   }
 
+  const revokeExportImagePreviews = (items: EditImageItem[]) => {
+    items.forEach((item) => {
+      if (item.type === 'new' && item.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl)
+      }
+    })
+  }
+
   const resetEditForm = () => {
     setEditTitle('')
     setEditMapId('')
@@ -249,7 +258,10 @@ function App() {
     setExportSide(null)
     setExportSite(null)
     setExportUtils(null)
-    setExportImages([])
+    setExportImages((current) => {
+      revokeExportImagePreviews(current)
+      return []
+    })
     setExportError(null)
   }
 
@@ -310,7 +322,7 @@ function App() {
       (a, b) => methodOrder.indexOf(a) - methodOrder.indexOf(b)
     )
 
-  const handleExportFiles = (files: FileList | null) => {
+  const handleExportFiles = (files: FileList | File[] | null) => {
     if (!files) return
     const nextFiles = Array.from(files).filter((file) =>
       file.type.startsWith('image/')
@@ -324,12 +336,54 @@ function App() {
     setExportError(null)
 
     setExportImages((current) => {
-      const combined = [...current, ...nextFiles]
-      if (combined.length > MAX_IMAGES) {
-        setExportError(`Maximo ${MAX_IMAGES} imagenes.`)
-        return combined.slice(0, MAX_IMAGES)
+      const remaining = MAX_IMAGES - current.length
+      if (remaining <= 0) {
+        setExportError(
+          `Ya tienes ${current.length} imagenes. Maximo ${MAX_IMAGES} en total.`
+        )
+        return current
       }
-      return combined
+
+      const filesToAdd = nextFiles.slice(0, remaining)
+      if (filesToAdd.length < nextFiles.length) {
+        setExportError(
+          `Puedes agregar hasta ${remaining} imagenes mas (maximo ${MAX_IMAGES} en total).`
+        )
+      }
+
+      const newItems = filesToAdd.map((file) => ({
+        id: `new-${nanoid(6)}`,
+        type: 'new' as const,
+        label: file.name,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }))
+
+      return [...current, ...newItems]
+    })
+  }
+
+  const reorderExportImages = (fromIndex: number, toIndex: number) => {
+    setExportImages((current) => {
+      if (fromIndex === toIndex) return current
+      if (fromIndex < 0 || toIndex < 0) return current
+      if (fromIndex >= current.length || toIndex >= current.length) return current
+      const next = [...current]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
+  const moveExportImage = (index: number, direction: -1 | 1) => {
+    setExportImages((current) => {
+      const next = [...current]
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= next.length) return current
+      const temp = next[index]
+      next[index] = next[targetIndex]
+      next[targetIndex] = temp
+      return next
     })
   }
 
@@ -365,43 +419,49 @@ function App() {
       return
     }
 
-    if (exportImages.length > MAX_IMAGES) {
-      setExportError(`Maximo ${MAX_IMAGES} imagenes.`)
-      return
-    }
-
     setIsExporting(true)
 
     try {
       const zip = new JSZip()
       const postId = generatePostId(exportMapId)
       const optimizedImages = await Promise.all(
-        exportImages.map(async (file, index) => {
-          const optimizedBlob = await optimizeImageBlob(file)
+        exportImages.map(async (item, index) => {
+          if (!item.file) return null
+          const optimizedBlob = await optimizeImageBlob(item.file)
           const extension =
-            getExtensionFromMime(optimizedBlob.type || file.type) ||
-            getFileExtension(file.name) ||
+            getExtensionFromMime(optimizedBlob.type || item.file.type) ||
+            getFileExtension(item.file.name) ||
             '.webp'
           return {
+            index,
             name: buildImageName(index, extension),
             blob: optimizedBlob,
           }
         })
       )
+      const orderedImages = optimizedImages
+        .filter((image): image is NonNullable<typeof image> => Boolean(image))
+        .sort((a, b) => a.index - b.index)
+
+      if (orderedImages.length === 0) {
+        setExportError('Debes tener al menos una imagen.')
+        return
+      }
+
       const jsonData = {
         id: postId,
         mapId: exportMapId,
         title: exportTitle.trim(),
         tags: exportTags,
         method: sortMethods(Array.from(exportMethod)),
-        imageCount: optimizedImages.length,
-        images: optimizedImages.map((image) => image.name),
+        imageCount: orderedImages.length,
+        images: orderedImages.map((image) => image.name),
       }
 
       zip.file('post.json', JSON.stringify(jsonData, null, 2))
 
       const imagesFolder = zip.folder('images')
-      optimizedImages.forEach((image) => {
+      orderedImages.forEach((image) => {
         imagesFolder?.file(image.name, image.blob)
       })
 
@@ -432,7 +492,7 @@ function App() {
     }
   }
 
-  const handleEditFiles = (files: FileList | null) => {
+  const handleEditFiles = (files: FileList | File[] | null) => {
     if (!files) return
     const nextFiles = Array.from(files).filter((file) =>
       file.type.startsWith('image/')
@@ -1164,17 +1224,22 @@ function App() {
                     {editImageItems.length}/{MAX_IMAGES}
                   </label>
                 </div>
-                <input
-                  type="file"
+                <Dropzone
                   accept="image/png,image/jpeg,image/webp,image/avif"
-                  multiple
-                  onChange={(event) => {
-                    handleEditFiles(event.target.files)
-                    event.currentTarget.value = ''
+                  onDrop={(files) => {
+                    handleEditFiles(files)
                   }}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   disabled={editImageItems.length >= MAX_IMAGES}
-                />
+                  className="w-full"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2 py-8">
+                    <Map className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-sm">
+                      <p className="font-medium text-foreground">Arrastra imagenes aquí</p>
+                      <p className="text-muted-foreground">o haz clic para seleccionar</p>
+                    </div>
+                  </div>
+                </Dropzone>
                 <div className="space-y-2">
                   {editImageItems.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
@@ -1184,7 +1249,7 @@ function App() {
                     editImageItems.map((item, index) => (
                       <div
                         key={item.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border px-3 py-2 cursor-grab active:cursor-grabbing"
                         draggable
                         onDragStart={(event) => {
                           event.dataTransfer.setData('text/plain', String(index))
@@ -1222,22 +1287,26 @@ function App() {
                             {item.type === 'existing' ? 'Actual' : 'Nueva'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => moveEditImage(index, -1)}
                             disabled={index === 0}
-                            className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground disabled:opacity-40"
+                            className="p-1.5 hover:bg-muted rounded-md transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Mover arriba"
+                            aria-label="Mover arriba"
                           >
-                            Subir
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button
                             type="button"
                             onClick={() => moveEditImage(index, 1)}
                             disabled={index === editImageItems.length - 1}
-                            className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground disabled:opacity-40"
+                            className="p-1.5 hover:bg-muted rounded-md transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Mover abajo"
+                            aria-label="Mover abajo"
                           >
-                            Bajar
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button
                             type="button"
@@ -1253,9 +1322,11 @@ function App() {
                                 })
                               )
                             }
-                            className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive"
+                            className="p-1.5 hover:bg-destructive/10 rounded-md transition"
+                            title="Eliminar"
+                            aria-label="Eliminar"
                           >
-                            Quitar
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </button>
                         </div>
                       </div>
@@ -1466,41 +1537,101 @@ function App() {
                     {exportImages.length}/{MAX_IMAGES}
                   </label>
                 </div>
-                <input
-                  type="file"
+                <Dropzone
                   accept="image/png,image/jpeg,image/webp,image/avif"
-                  multiple
-                  onChange={(event) => {
-                    handleExportFiles(event.target.files)
-                    event.currentTarget.value = ''
+                  onDrop={(files) => {
+                    handleExportFiles(files)
                   }}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
+                  className="w-full"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2 py-8">
+                    <Map className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-sm">
+                      <p className="font-medium text-foreground">Arrastra imagenes aquí</p>
+                      <p className="text-muted-foreground">o haz clic para seleccionar</p>
+                    </div>
+                  </div>
+                </Dropzone>
                 <div className="space-y-2">
                   {exportImages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Sube hasta 4 imagenes en orden.
                     </p>
                   ) : (
-                    exportImages.map((file, index) => (
+                    exportImages.map((item, index) => (
                       <div
-                        key={`${file.name}-${index}`}
-                        className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                        key={item.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border px-3 py-2 cursor-grab active:cursor-grabbing"
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData('text/plain', String(index))
+                          event.dataTransfer.effectAllowed = 'move'
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault()
+                          event.dataTransfer.dropEffect = 'move'
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          const fromIndex = Number(event.dataTransfer.getData('text/plain'))
+                          if (Number.isNaN(fromIndex)) return
+                          reorderExportImages(fromIndex, index)
+                        }}
                       >
-                        <span className="text-sm text-foreground">
-                          {index + 1}. {file.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExportImages((current) =>
-                              current.filter((_, itemIndex) => itemIndex !== index)
-                            )
-                          }
-                          className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive"
-                        >
-                          Quitar
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {item.previewUrl ? (
+                            <img
+                              src={item.previewUrl}
+                              alt={item.label}
+                              className="h-12 w-12 rounded-md object-cover"
+                            />
+                          ) : null}
+                          <span className="text-sm text-foreground">
+                            {index + 1}. {item.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => moveExportImage(index, -1)}
+                            disabled={index === 0}
+                            className="p-1.5 hover:bg-muted rounded-md transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Mover arriba"
+                            aria-label="Mover arriba"
+                          >
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveExportImage(index, 1)}
+                            disabled={index === exportImages.length - 1}
+                            className="p-1.5 hover:bg-muted rounded-md transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Mover abajo"
+                            aria-label="Mover abajo"
+                          >
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExportImages((current) =>
+                                current.filter((_, itemIndex) => {
+                                  if (itemIndex !== index) return true
+                                  if (current[itemIndex]?.type === 'new') {
+                                    const previewUrl = current[itemIndex]?.previewUrl
+                                    if (previewUrl) URL.revokeObjectURL(previewUrl)
+                                  }
+                                  return false
+                                })
+                              )
+                            }
+                            className="p-1.5 hover:bg-destructive/10 rounded-md transition"
+                            title="Eliminar"
+                            aria-label="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -1516,7 +1647,7 @@ function App() {
               <Button variant="outline" onClick={closeExportModal}>
                 Cancelar
               </Button>
-              <Button onClick={handleExport} disabled={isExporting}>
+              <Button onClick={handleExport} disabled={isExporting || exportImages.length === 0}>
                 {isExporting ? 'Generando...' : 'Descargar post'}
               </Button>
             </div>
