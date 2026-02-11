@@ -105,36 +105,40 @@ export const anubisPosts: MapPost[] = [
     tags: ['CT', 'A', 'MOLO'],
     method: ['THROW', 'DOUBLE', 'WALK'],
   },
-  {
+    {
     id: 'de_anubis-pYclUWCM',
     mapId: 'de_anubis',
     title: 'DUO MID TUNNELS',
-    images: ['anubis/image_1.webp', 'anubis/image_2.webp', 'anubis/image_3.webp'],
+    images: ['anubis/de_anubis-pYclUWCM-1.webp', 'anubis/de_anubis-pYclUWCM-2.webp', 'anubis/de_anubis-pYclUWCM-3.webp'],
     tags: ['T', 'MID', 'MOLO'],
     method: ['THROW', 'RUN'],
   },
-  {
+
+    {
     id: 'de_anubis-UI_yjCoW',
     mapId: 'de_anubis',
     title: 'DUO MID CAMERA',
-    images: ['anubis/image_1.webp', 'anubis/image_2.webp', 'anubis/image_3.webp'],
+    images: ['anubis/de_anubis-UI_yjCoW-1.webp', 'anubis/de_anubis-UI_yjCoW-2.webp', 'anubis/de_anubis-UI_yjCoW-3.webp'],
     tags: ['T', 'MID', 'MOLO'],
     method: ['THROW'],
   },
-  {
+
+    {
     id: 'de_anubis-i_hZ0UEp',
     mapId: 'de_anubis',
     title: 'DUO MID TUNNEL',
-    images: ['anubis/image_1.webp', 'anubis/image_2.webp', 'anubis/image_3.webp'],
+    images: ['anubis/de_anubis-i_hZ0UEp-1.webp', 'anubis/de_anubis-i_hZ0UEp-2.webp', 'anubis/de_anubis-i_hZ0UEp-3.webp'],
     tags: ['T', 'MID', 'SMOKE'],
     method: ['JUMP', 'THROW'],
   },
-  {
+
+    {
     id: 'de_anubis-pZC4qiNz',
     mapId: 'de_anubis',
     title: 'DUO MID CAMERA',
-    images: ['anubis/image_1.webp', 'anubis/image_2.webp', 'anubis/image_3.webp'],
+    images: ['anubis/de_anubis-pZC4qiNz-1.webp', 'anubis/de_anubis-pZC4qiNz-2.webp', 'anubis/de_anubis-pZC4qiNz-3.webp'],
     tags: ['T', 'MID', 'SMOKE'],
     method: ['JUMP', 'THROW'],
   },
+
 ]

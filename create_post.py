@@ -219,21 +219,28 @@ class PostImporterApp:
             
             map_id = post_data.get("mapId")
             map_name = map_id.replace("de_", "")
+            post_id = post_data.get("id", "unknown")
             
             # Crear directorio de imágenes si no existe
             map_images_dir = IMAGES_DIR / map_name
             map_images_dir.mkdir(parents=True, exist_ok=True)
             
-            # Copiar imágenes del ZIP
+            # Copiar imágenes del ZIP con nombre único basado en el ID del post
             image_files = []
+            image_counter = 1
             for name in zipf.namelist():
                 if name.startswith("images/") and not name.endswith('/'):
                     image_data = zipf.read(name)
-                    image_filename = Path(name).name
-                    dest_path = map_images_dir / image_filename
+                    # Obtener extensión original
+                    original_filename = Path(name).name
+                    ext = Path(original_filename).suffix
+                    # Renombrar con ID del post para evitar conflictos
+                    new_filename = f"{post_id}-{image_counter}{ext}"
+                    dest_path = map_images_dir / new_filename
                     with open(dest_path, 'wb') as f:
                         f.write(image_data)
-                    image_files.append(f"{map_name}/{image_filename}")
+                    image_files.append(f"{map_name}/{new_filename}")
+                    image_counter += 1
             
             # Actualizar rutas de imágenes en los datos
             if image_files:
@@ -247,9 +254,6 @@ class PostImporterApp:
             
             with open(ts_file, 'r', encoding='utf-8') as f:
                 ts_content = f.read()
-            
-            # Crear entrada del post en TypeScript
-            post_id = post_data.get("id", "")
             
             # Construir el objeto del post
             images_str = ", ".join([f"'{img}'" for img in post_data.get("images", [])])
@@ -312,7 +316,7 @@ if __name__ == "__main__":
 
 def main():
     root = tk.Tk()
-    app = PostCreatorApp(root)
+    app = PostImporterApp(root)
     root.mainloop()
 
 
