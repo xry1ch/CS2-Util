@@ -60,6 +60,7 @@ const siteOptions = ['A', 'MID', 'B']
 const tags = ['SMOKE', 'MOLO', 'FLASH', 'NADE']
 const methodComponents = ['THROW', 'DOUBLE', 'JUMP', 'CROUCH', 'WALK', 'RUN']
 const methodOrder = ['CROUCH', 'JUMP', 'THROW', 'DOUBLE', 'WALK', 'RUN']
+const MAX_IMAGES = 4
 const sanitizeTitle = (value: string) =>
   value
     .replace(/[^a-zA-Z0-9 ]+/g, '')
@@ -186,9 +187,9 @@ function App() {
 
     setExportImages((current) => {
       const combined = [...current, ...nextFiles]
-      if (combined.length > 3) {
-        setExportError('Maximo 3 imagenes.')
-        return combined.slice(0, 3)
+      if (combined.length > MAX_IMAGES) {
+        setExportError(`Maximo ${MAX_IMAGES} imagenes.`)
+        return combined.slice(0, MAX_IMAGES)
       }
       return combined
     })
@@ -226,8 +227,8 @@ function App() {
       return
     }
 
-    if (exportImages.length > 3) {
-      setExportError('Maximo 3 imagenes.')
+    if (exportImages.length > MAX_IMAGES) {
+      setExportError(`Maximo ${MAX_IMAGES} imagenes.`)
       return
     }
 
@@ -298,12 +299,12 @@ function App() {
 
     setEditError(null)
 
-    const maxAllowed = 3 - (activePost?.images.length ?? 0)
+    const maxAllowed = MAX_IMAGES - (activePost?.images.length ?? 0)
     const filesToAdd = nextFiles.slice(0, Math.max(0, maxAllowed))
 
     if (filesToAdd.length === 0) {
       setEditError(
-        `Ya tienes ${activePost?.images.length} imagenes. Maximo 3 en total.`
+        `Ya tienes ${activePost?.images.length} imagenes. Maximo ${MAX_IMAGES} en total.`
       )
       return
     }
@@ -312,7 +313,7 @@ function App() {
       const combined = [...current, ...filesToAdd]
       if (combined.length > maxAllowed) {
         setEditError(
-          `Puedes agregar hasta ${maxAllowed} imagenes mas (maximo 3 en total).`
+          `Puedes agregar hasta ${maxAllowed} imagenes mas (maximo ${MAX_IMAGES} en total).`
         )
         return combined.slice(0, maxAllowed)
       }
@@ -708,14 +709,16 @@ function App() {
             </div>
             <div
               className={`grid gap-4 px-6 py-6 ${
-                activePost.images.length === 1
+                Math.min(activePost.images.length, MAX_IMAGES) === 1
                   ? 'md:grid-cols-1'
-                  : activePost.images.length === 2
+                  : Math.min(activePost.images.length, MAX_IMAGES) === 2
                     ? 'md:grid-cols-2'
-                    : 'md:grid-cols-2 lg:grid-cols-3'
+                    : Math.min(activePost.images.length, MAX_IMAGES) === 4
+                      ? 'md:grid-cols-2 lg:grid-cols-2'
+                      : 'md:grid-cols-2 lg:grid-cols-3'
               }`}
             >
-              {activePost.images.slice(0, 3).map((image, index) => {
+              {activePost.images.slice(0, MAX_IMAGES).map((image, index) => {
                 const imageUrl = resolvePostImage(image)
                 return (
                   <button
@@ -786,7 +789,7 @@ function App() {
                     Imagenes actuales
                   </label>
                   <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {activePost.images.length}/3
+                    {activePost.images.length}/{MAX_IMAGES}
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -808,7 +811,7 @@ function App() {
                   <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
                     {editPostImages.length}/{Math.max(
                       0,
-                      3 - activePost.images.length
+                      MAX_IMAGES - activePost.images.length
                     )}
                   </label>
                 </div>
@@ -821,14 +824,14 @@ function App() {
                     event.currentTarget.value = ''
                   }}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  disabled={activePost.images.length >= 3}
+                  disabled={activePost.images.length >= MAX_IMAGES}
                 />
                 <div className="space-y-2">
                   {editPostImages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      {activePost.images.length >= 3
+                      {activePost.images.length >= MAX_IMAGES
                         ? 'Ya tienes el maximo de imagenes.'
-                        : `Sube hasta ${3 - activePost.images.length} imagenes mas.`}
+                        : `Sube hasta ${MAX_IMAGES - activePost.images.length} imagenes mas.`}
                     </p>
                   ) : (
                     editPostImages.map((file, index) => (
@@ -1056,10 +1059,10 @@ function App() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-foreground">
-                    Imagenes (max 3)
+                    Imagenes (max 4)
                   </label>
                   <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {exportImages.length}/3
+                    {exportImages.length}/{MAX_IMAGES}
                   </label>
                 </div>
                 <input
@@ -1075,7 +1078,7 @@ function App() {
                 <div className="space-y-2">
                   {exportImages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Sube hasta 3 imagenes en orden.
+                      Sube hasta 4 imagenes en orden.
                     </p>
                   ) : (
                     exportImages.map((file, index) => (
