@@ -64,6 +64,14 @@ const MAX_IMAGES = 4
 const OPTIMIZED_MAX_DIMENSION = 1920
 const OPTIMIZED_QUALITY = 0.9
 const OPTIMIZED_MIME = 'image/webp'
+type EditImageItem = {
+  id: string
+  type: 'existing' | 'new'
+  label: string
+  path?: string
+  file?: File
+  previewUrl?: string
+}
 const sanitizeTitle = (value: string) =>
   value
     .replace(/[^a-zA-Z0-9 ]+/g, '')
@@ -159,7 +167,13 @@ function App() {
   const [exportError, setExportError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [editPostImages, setEditPostImages] = useState<File[]>([])
+  const [editTitle, setEditTitle] = useState('')
+  const [editMapId, setEditMapId] = useState('')
+  const [editMethod, setEditMethod] = useState<Set<string>>(new Set())
+  const [editSide, setEditSide] = useState<string | null>(null)
+  const [editSite, setEditSite] = useState<string | null>(null)
+  const [editUtils, setEditUtils] = useState<string | null>(null)
+  const [editImageItems, setEditImageItems] = useState<EditImageItem[]>([])
   const [editError, setEditError] = useState<string | null>(null)
   const [isEditExporting, setIsEditExporting] = useState(false)
 
@@ -194,6 +208,33 @@ function App() {
     })
   }
 
+  const revokeEditImagePreviews = (items: EditImageItem[]) => {
+    items.forEach((item) => {
+      if (item.type === 'new' && item.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl)
+      }
+    })
+  }
+
+  const resetEditForm = () => {
+    setEditTitle('')
+    setEditMapId('')
+    setEditMethod(new Set())
+    setEditSide(null)
+    setEditSite(null)
+    setEditUtils(null)
+    setEditImageItems((current) => {
+      revokeEditImagePreviews(current)
+      return []
+    })
+    setEditError(null)
+  }
+
+  const closeEditModal = () => {
+    setIsEditMode(false)
+    resetEditForm()
+  }
+
   const resetExportForm = () => {
     setExportTitle('')
     setExportMapId(maps[0]?.id ?? '')
@@ -209,6 +250,27 @@ function App() {
     setIsExportOpen(false)
     resetExportForm()
   }
+
+  useEffect(() => {
+    if (!isEditMode || !activePost) return
+
+    setEditTitle(activePost.title)
+    setEditMapId(activePost.mapId)
+    setEditMethod(new Set(activePost.method))
+    setEditSide(sideOptions.find((option) => activePost.tags.includes(option)) ?? null)
+    setEditSite(siteOptions.find((option) => activePost.tags.includes(option)) ?? null)
+    setEditUtils(tags.find((option) => activePost.tags.includes(option)) ?? null)
+    setEditImageItems((current) => {
+      revokeEditImagePreviews(current)
+      return activePost.images.map((image, index) => ({
+        id: `existing-${index}-${image}`,
+        type: 'existing',
+        label: image,
+        path: image,
+      }))
+    })
+    setEditError(null)
+  }, [activePost, isEditMode])
 
   const filteredPosts = useMemo(() => {
     if (!selectedMap) return []
@@ -371,25 +433,55 @@ function App() {
 
     setEditError(null)
 
-    const maxAllowed = MAX_IMAGES - (activePost?.images.length ?? 0)
-    const filesToAdd = nextFiles.slice(0, Math.max(0, maxAllowed))
-
-    if (filesToAdd.length === 0) {
-      setEditError(
-        `Ya tienes ${activePost?.images.length} imagenes. Maximo ${MAX_IMAGES} en total.`
-      )
-      return
-    }
-
-    setEditPostImages((current) => {
-      const combined = [...current, ...filesToAdd]
-      if (combined.length > maxAllowed) {
+    setEditImageItems((current) => {
+      const remaining = MAX_IMAGES - current.length
+      if (remaining <= 0) {
         setEditError(
-          `Puedes agregar hasta ${maxAllowed} imagenes mas (maximo ${MAX_IMAGES} en total).`
+          `Ya tienes ${current.length} imagenes. Maximo ${MAX_IMAGES} en total.`
         )
-        return combined.slice(0, maxAllowed)
+        return current
       }
-      return combined
+
+      const filesToAdd = nextFiles.slice(0, remaining)
+      if (filesToAdd.length < nextFiles.length) {
+        setEditError(
+          `Puedes agregar hasta ${remaining} imagenes mas (maximo ${MAX_IMAGES} en total).`
+        )
+      }
+
+      const newItems = filesToAdd.map((file) => ({
+        id: `new-${nanoid(6)}`,
+        type: 'new' as const,
+        label: file.name,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }))
+
+      return [...current, ...newItems]
+    })
+  }
+
+  const reorderEditImages = (fromIndex: number, toIndex: number) => {
+    setEditImageItems((current) => {
+      if (fromIndex === toIndex) return current
+      if (fromIndex < 0 || toIndex < 0) return current
+      if (fromIndex >= current.length || toIndex >= current.length) return current
+      const next = [...current]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
+  const moveEditImage = (index: number, direction: -1 | 1) => {
+    setEditImageItems((current) => {
+      const next = [...current]
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= next.length) return current
+      const temp = next[index]
+      next[index] = next[targetIndex]
+      next[targetIndex] = temp
+      return next
     })
   }
 
@@ -401,8 +493,31 @@ function App() {
       return
     }
 
-    const currentImageCount = activePost.images.length + editPostImages.length
-    if (currentImageCount === 0) {
+    if (!editTitle.trim()) {
+      setEditError('Debes ingresar un titulo.')
+      return
+    }
+
+    if (!editMapId) {
+      setEditError('Debes seleccionar un mapa.')
+      return
+    }
+
+    if (editMethod.size === 0) {
+      setEditError('Debes seleccionar al menos un componente de metodo.')
+      return
+    }
+
+    const editTags = [editSide, editSite, editUtils].filter(
+      (tag): tag is string => Boolean(tag)
+    )
+
+    if (editTags.length === 0) {
+      setEditError('Debes seleccionar al menos un tag.')
+      return
+    }
+
+    if (editImageItems.length === 0) {
       setEditError('Debes tener al menos una imagen.')
       return
     }
@@ -411,16 +526,31 @@ function App() {
 
     try {
       const zip = new JSZip()
-      const existingImages = await Promise.all(
-        activePost.images.map(async (imagePath, index) => {
-          const imageUrl = resolvePostImage(imagePath)
-          if (!imageUrl) return null
-          const response = await fetch(imageUrl)
-          const blob = await response.blob()
-          const optimizedBlob = await optimizeImageBlob(blob)
+      const optimizedImages = await Promise.all(
+        editImageItems.map(async (item, index) => {
+          if (item.type === 'existing') {
+            if (!item.path) return null
+            const imageUrl = resolvePostImage(item.path)
+            if (!imageUrl) return null
+            const response = await fetch(imageUrl)
+            const blob = await response.blob()
+            const optimizedBlob = await optimizeImageBlob(blob)
+            const extension =
+              getExtensionFromMime(optimizedBlob.type || blob.type) ||
+              getFileExtension(item.path) ||
+              '.webp'
+            return {
+              index,
+              name: buildImageName(index, extension),
+              blob: optimizedBlob,
+            }
+          }
+
+          if (!item.file) return null
+          const optimizedBlob = await optimizeImageBlob(item.file)
           const extension =
-            getExtensionFromMime(optimizedBlob.type || blob.type) ||
-            getFileExtension(imagePath) ||
+            getExtensionFromMime(optimizedBlob.type || item.file.type) ||
+            getFileExtension(item.file.name) ||
             '.webp'
           return {
             index,
@@ -429,45 +559,35 @@ function App() {
           }
         })
       )
-      const newImages = await Promise.all(
-        editPostImages.map(async (file, index) => {
-          const imageIndex = activePost.images.length + index
-          const optimizedBlob = await optimizeImageBlob(file)
-          const extension =
-            getExtensionFromMime(optimizedBlob.type || file.type) ||
-            getFileExtension(file.name) ||
-            '.webp'
-          return {
-            index: imageIndex,
-            name: buildImageName(imageIndex, extension),
-            blob: optimizedBlob,
-          }
-        })
-      )
-      const optimizedImages = [...existingImages, ...newImages]
+      const orderedImages = optimizedImages
         .filter((image): image is NonNullable<typeof image> => Boolean(image))
         .sort((a, b) => a.index - b.index)
 
+      if (orderedImages.length === 0) {
+        setEditError('Debes tener al menos una imagen.')
+        return
+      }
+
       const jsonData = {
         id: activePost.id,
-        mapId: activePost.mapId,
-        title: activePost.title,
-        tags: activePost.tags,
-        method: sortMethods(activePost.method),
-        imageCount: optimizedImages.length,
-        images: optimizedImages.map((image) => image.name),
+        mapId: editMapId,
+        title: editTitle.trim(),
+        tags: editTags,
+        method: sortMethods(Array.from(editMethod)),
+        imageCount: orderedImages.length,
+        images: orderedImages.map((image) => image.name),
       }
 
       zip.file('post.json', JSON.stringify(jsonData, null, 2))
 
       const imagesFolder = zip.folder('images')
 
-      optimizedImages.forEach((image) => {
+      orderedImages.forEach((image) => {
         imagesFolder?.file(image.name, image.blob)
       })
 
       const blob = await zip.generateAsync({ type: 'blob' })
-      const slug = activePost.title
+      const slug = editTitle
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
@@ -485,7 +605,7 @@ function App() {
 
       setActivePost(null)
       setIsEditMode(false)
-      setEditPostImages([])
+      resetEditForm()
     } catch (error) {
       console.error(error)
       setEditError('No se pudo generar el archivo. Intentalo de nuevo.')
@@ -845,7 +965,7 @@ function App() {
       {isEditMode && activePost ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8"
-          onClick={() => setIsEditMode(false)}
+          onClick={closeEditModal}
         >
           <div
             className="relative w-full max-w-2xl rounded-2xl border border-border bg-background shadow-xl"
@@ -857,49 +977,169 @@ function App() {
                   Editar
                 </p>
                 <h2 className="text-2xl font-semibold text-foreground">
-                  {activePost.title}
+                  {editTitle || activePost.title}
                 </h2>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsEditMode(false)}
+                onClick={closeEditModal}
                 aria-label="Cerrar"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
             <div className="space-y-6 px-6 py-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Titulo
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(event) =>
+                    setEditTitle(sanitizeTitle(event.target.value))
+                  }
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Ej: Smoke A Site"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Imagenes actuales
+                    Mapa
                   </label>
-                  <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {activePost.images.length}/{MAX_IMAGES}
-                  </span>
+                  <Select value={editMapId} onValueChange={setEditMapId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un mapa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {maps.map((map) => (
+                        <SelectItem key={map.id} value={map.id}>
+                          {map.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  {activePost.images.map((image, index) => (
-                    <div
-                      key={`current-${image}-${index}`}
-                      className="rounded-md border border-border px-3 py-2 text-sm text-foreground"
-                    >
-                      {index + 1}. {image}
-                    </div>
-                  ))}
+                  <label className="text-sm font-medium text-foreground">
+                    Metodo
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {methodComponents.map((method) => {
+                      const isSelected = editMethod.has(method)
+                      return (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => toggleExportSet(method, setEditMethod)}
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {method}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Side
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {sideOptions.map((option) => {
+                      const isSelected = editSide === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setEditSide((current) =>
+                              current === option ? null : option
+                            )
+                          }
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Site
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {siteOptions.map((option) => {
+                      const isSelected = editSite === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setEditSite((current) =>
+                              current === option ? null : option
+                            )
+                          }
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Utilidades
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((option) => {
+                      const isSelected = editUtils === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setEditUtils((current) =>
+                              current === option ? null : option
+                            )
+                          }
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-foreground">
-                    Agregar imagenes
+                    Imagenes (max 4)
                   </label>
                   <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {editPostImages.length}/{Math.max(
-                      0,
-                      MAX_IMAGES - activePost.images.length
-                    )}
+                    {editImageItems.length}/{MAX_IMAGES}
                   </label>
                 </div>
                 <input
@@ -911,35 +1151,91 @@ function App() {
                     event.currentTarget.value = ''
                   }}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  disabled={activePost.images.length >= MAX_IMAGES}
+                  disabled={editImageItems.length >= MAX_IMAGES}
                 />
                 <div className="space-y-2">
-                  {editPostImages.length === 0 ? (
+                  {editImageItems.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      {activePost.images.length >= MAX_IMAGES
-                        ? 'Ya tienes el maximo de imagenes.'
-                        : `Sube hasta ${MAX_IMAGES - activePost.images.length} imagenes mas.`}
+                      Sube hasta 4 imagenes en orden.
                     </p>
                   ) : (
-                    editPostImages.map((file, index) => (
+                    editImageItems.map((item, index) => (
                       <div
-                        key={`new-${file.name}-${index}`}
-                        className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                        key={item.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData('text/plain', String(index))
+                          event.dataTransfer.effectAllowed = 'move'
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault()
+                          event.dataTransfer.dropEffect = 'move'
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          const fromIndex = Number(event.dataTransfer.getData('text/plain'))
+                          if (Number.isNaN(fromIndex)) return
+                          reorderEditImages(fromIndex, index)
+                        }}
                       >
-                        <span className="text-sm text-foreground">
-                          {activePost.images.length + index + 1}. {file.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditPostImages((current) =>
-                              current.filter((_, itemIndex) => itemIndex !== index)
-                            )
-                          }
-                          className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive"
-                        >
-                          Quitar
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {item.type === 'existing' && item.path ? (
+                            <img
+                              src={resolvePostImage(item.path)}
+                              alt={item.label}
+                              className="h-12 w-12 rounded-md object-cover"
+                            />
+                          ) : item.previewUrl ? (
+                            <img
+                              src={item.previewUrl}
+                              alt={item.label}
+                              className="h-12 w-12 rounded-md object-cover"
+                            />
+                          ) : null}
+                          <span className="text-sm text-foreground">
+                            {index + 1}. {item.label}
+                          </span>
+                          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            {item.type === 'existing' ? 'Actual' : 'Nueva'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => moveEditImage(index, -1)}
+                            disabled={index === 0}
+                            className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground disabled:opacity-40"
+                          >
+                            Subir
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveEditImage(index, 1)}
+                            disabled={index === editImageItems.length - 1}
+                            className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground disabled:opacity-40"
+                          >
+                            Bajar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditImageItems((current) =>
+                                current.filter((_, itemIndex) => {
+                                  if (itemIndex !== index) return true
+                                  if (current[itemIndex]?.type === 'new') {
+                                    const previewUrl = current[itemIndex]?.previewUrl
+                                    if (previewUrl) URL.revokeObjectURL(previewUrl)
+                                  }
+                                  return false
+                                })
+                              )
+                            }
+                            className="text-xs font-semibold uppercase tracking-[0.2em] text-destructive"
+                          >
+                            Quitar
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -954,17 +1250,13 @@ function App() {
             <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setIsEditMode(false)
-                  setEditPostImages([])
-                  setEditError(null)
-                }}
+                onClick={closeEditModal}
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleEditExport}
-                disabled={isEditExporting || editPostImages.length === 0}
+                disabled={isEditExporting || editImageItems.length === 0}
               >
                 {isEditExporting ? 'Generando...' : 'Descargar actualizado'}
               </Button>
