@@ -82,4 +82,12 @@ export const nukePosts: MapPost[] = [
     tags: ['T', 'A', 'MOLO'],
     method: ['THROW', 'RUN'],
   },
+  {
+    id: 'de_nuke-41skPN_9',
+    mapId: 'de_nuke',
+    title: 'STOP PUSH SINGLE DOOR',
+    images: ['nuke/stop-push-single-door-ct-nade-1.webp', 'nuke/stop-push-single-door-ct-nade-2.webp'],
+    tags: ['CT', 'A', 'NADE'],
+    method: ['THROW', 'RUN'],
+  },
 ]
